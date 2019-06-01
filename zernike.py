@@ -18,9 +18,9 @@ def compare_queries(x,y):
 	dot_prod = sum(i[0] * i[1] for i in zip(x, y))
 	return round(666.667 * (dot_prod - .850),1) 
 
-def test_query(z, images, hash_zernike):
+def test_query(z, hash_zernike):
 	zernike_list = []
-	for img_index in range(len(images)):
+	for img_index in hash_zernike:
 		zernike_list.append((img_index, compare_queries(z, hash_zernike[img_index])))
 	return zernike_list	
 
