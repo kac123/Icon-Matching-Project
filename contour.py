@@ -1,4 +1,10 @@
+import cv2
+import numpy as np
+import math
+
 from util import image_preprocess, find_max, find_tiebreaker, get_midway, find_intersect
+
+#fuck if I know how this shit works, need to refactor to look like zernike.py
 
 def create_query(img, fractions=[.1,.2,.3,.4,.5,.6,.7,.8,.9]):
 	query_obj = {}
@@ -106,7 +112,7 @@ def test_query(image_query, images, hash_obj, error=0.002, fractions=[.1,.2,.3,.
 	matched_list = []
 
 	# loop through each of the fractions (key of the dictionary)
-	for f in tqdm_notebook(fractions):
+	for f in fractions:
 	
 		# loop through each distance in the database and check if the distance matches with the image query
 		for hash_dict in  hash_obj.get(f) :
@@ -126,3 +132,11 @@ def test_query(image_query, images, hash_obj, error=0.002, fractions=[.1,.2,.3,.
 	match = dict((k, round(float(counted_list[k])*100/total_count[k],1)) for k in total_count)
 	match = sorted(match.items(), key=lambda t: t[0])
 	return match 
+
+def generate_database(images):
+	contour_database  = {}
+	for img_index in range(len(images)):
+		img = images[img_index]
+		if img is not None:
+			contour_database[img_index] = create_query(img)
+	return contour_database

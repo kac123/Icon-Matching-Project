@@ -1,16 +1,30 @@
+import h5py
+import cv2
+import numpy as np
+import pickle
+import math
+
+RESOURCE_PATH = "res/"
 # save and load pickle objects 
 def save_obj(obj, name ):
-    with open('obj/'+ name + '.pkl', 'wb') as f:
+    with open(RESOURCE_PATH + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 		
 def load_obj(name ):
-    with open('obj/' + name + '.pkl', 'rb') as f:
+    with open(RESOURCE_PATH + name + '.pkl', 'rb') as f:
         return pickle.load(f)		
 
 # create grayscale image from database image
 def gray( img ):
 	img = img.astype('uint8')
 	return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype('uint8')
+
+def load_images(filename = None):
+	if filename: #LLD-icon.hdf5
+		hdf5_file = h5py.File(RESOURCE_PATH + filename, 'r')
+		images, labels = (hdf5_file['data'], hdf5_file['labels/resnet/rc_64'])
+		return images
+	return [i for i in map(cv2.imread, iglob('shoes/**/*.jpg', recursive=True)) if i is not None]
 
 # find max distance given a list of points 
 def find_max( point_list):
@@ -111,11 +125,11 @@ def find_intersect( x1, y1, x2, y2):
 
 def canny(img):
 	cimg = cv2.Canny(img,100,200)
-	if np.amax(edges1,axis=(0,1)) == 0:
+	if np.amax(cimg,axis=(0,1)) == 0:
 		cimg = cv2.Canny(img,20,100)
-	if np.amax(edges1,axis=(0,1)) == 0:
+	if np.amax(cimg,axis=(0,1)) == 0:
 		cimg = cv2.Canny(img,5,20)
-	if np.amax(edges1,axis=(0,1)) == 0:
+	if np.amax(cimg,axis=(0,1)) == 0:
 		cimg = cv2.Canny(img,1,5)	
 	return cimg
 
