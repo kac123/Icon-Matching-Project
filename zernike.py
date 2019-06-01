@@ -15,5 +15,4 @@ def test_query(z, images, hash_zernike):
 	for w in tqdm_notebook( range(len(images)) ):
 		dot_prod = sum(i[0] * i[1] for i in zip(hash_zernike[w], z ))
 		zernike_list.append(( w,round(666.667 * (dot_prod - .850),1) ))
-		
 	return zernike_list	
