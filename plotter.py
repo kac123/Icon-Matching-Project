@@ -17,7 +17,7 @@ def plot_results (img, results, images, filename = None):
 		result_cells[c_inx].imshow(gray(images[results[c_inx][0]]), cmap=plt.cm.gray)
 		result_cells[c_inx].set_xlim([0,32])
 		result_cells[c_inx].set_ylim([32,0])
-		result_cells[c_inx].set_title('match score: ' + str(results[c_inx][1]), fontsize=20, y = 1.0)
+		result_cells[c_inx].set_title('match score: ' + '%.1f'%(results[c_inx][1]), fontsize=20, y = 1.0)
 	
 	# maximize the window and display plots 
 	fig.tight_layout()

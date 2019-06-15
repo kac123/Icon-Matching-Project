@@ -1,3 +1,6 @@
+#KARAN this is broken, test_queries doesn't work. I think you might still be assuming the old database structure in compare_queries
+# try to generate a new database with the generate_database function and run a query, you can see a bunch of commands like this in testground.py
+
 import cv2
 import numpy as np
 import math
@@ -102,7 +105,7 @@ def create_query(img, fractions=[.1,.2,.3,.4,.5,.6,.7,.8,.9]):
 	
 	return query_obj
 
-def compare_queries(x,y , error = 0.002, fractions = [.1,.2,.3,.4,.5,.6,.7,.8,.9]) :
+def compare_queries(x,y, error = 0.002, fractions = [.1,.2,.3,.4,.5,.6,.7,.8,.9]) :
 	# track all of the matched images
 	total_points = 0
 	matched_points = 0

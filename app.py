@@ -5,6 +5,9 @@ import uuid
 import cv2
 
 import zernike
+import orb
+import sift
+import combined
 import util
 import plotter
 
@@ -16,8 +19,9 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULTS'] = RESULTS
 
-maybe = {}
 zernike_database = util.load_obj('zernike_database_icon_10')
+orb_database = util.load_obj('orb_database_icon_10')
+sift_database = util.load_obj('sift_database_icon_10')
 images = util.load_images("icon_sample")
 
 def allowed_file(filename):
@@ -43,7 +47,7 @@ def upload_file():
                                     filename=filename))
     return '''
     <!doctype html>
-    <title>Upload new File</title>
+    <title>TEST YOUR IMAGE FOR PLAGIARISM!</title>
     <h1>Upload new File</h1>
     <form method=post enctype=multipart/form-data>
       <input type=file name=file>
@@ -57,7 +61,14 @@ def uploaded_file(filename):
 
 def run_image(filename):
     img = cv2.imread(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+    print("starting")
+    o = orb.create_query(img)
+    o = orb.test_query(o, orb_database)
+    s = sift.create_query(img)
+    s = sift.test_query(s, sift_database)
     z = zernike.create_query(img)
-    res = zernike.test_query(z, zernike_database)
-    res = sorted(res, key = lambda tup: tup[1], reverse = True )
+    z = zernike.test_query(z, zernike_database)
+    res = combined.test_combined([z,o,s], [1,5,5])
+
     plotter.plot_results(img, res, images, os.path.join(app.config['RESULTS'], filename))

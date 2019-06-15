@@ -17,8 +17,7 @@ def load_obj(name):
 
 # create grayscale image from database image
 def gray( img ):
-	img = img.astype('uint8')
-	return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).astype('uint8')
+	return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
 def load_images(filename = None, hdf5 = False):
 	if hdf5: #LLD-icon.hdf5

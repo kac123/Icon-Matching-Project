@@ -4,9 +4,40 @@ import cv2
 import plotter
 import combined
 import contour
+import orb
+import sift
 
 zernike_database = util.load_obj('zernike_database_icon_10')
+orb_database = util.load_obj('orb_database_icon_10')
+sift_database = util.load_obj('sift_database_icon_10')
 images = util.load_images("icon_sample")
+# images = images[:10]
+img = images[0]
+
+# orb_database = orb.generate_database(images)
+# util.save_obj(orb_database, 'orb_database_icon_10')
+# sift_database = sift.generate_database(images)
+# util.save_obj(sift_database, 'sift_database_icon_10')
+
+
+# s = sift.create_query(img)
+# s = sift.test_query(s, sift_database)
+# plotter.plot_results(img, s, images)
+
+print("starting")
+o = orb.create_query(img)
+o = orb.test_query(o, orb_database)
+print("orb")
+s = sift.create_query(img)
+s = sift.test_query(s, sift_database)
+print("sift")
+z = zernike.create_query(img)
+z = zernike.test_query(z, zernike_database)
+print("zernike")
+res = combined.test_combined([z,o,s], [1,5,5])
+plotter.plot_results(img, res, images)
+
+
 
 # img = images[0]
 # z = zernike.create_query(images[0])
@@ -42,14 +73,14 @@ images = util.load_images("icon_sample")
 # z = zernike.create_query(images[0])
 # print(zernike.test_query(z, zernike_database))
 
+# contour_database = util.load_obj('contour_database_icon_10')
+# c = contour.create_query(images[0])
+# print(c)
 
-c = contour.create_query(images[0])
-print(c)
+#contour_database = contour.generate_database(images)
+#util.save_obj(contour_database, 'contour_database_icon_10')
 
-contour_database = contour.generate_database(images)
-util.save_obj(contour_database, 'contour_database_icon_10')
-
-print(contour.test_query(c, images, contour_database))
+# print(contour.test_query(c, contour_database))
 # # contour_database = contour.generate_database(images)
 # # util.save_obj(contour_database, 'contour_database_icon_10')
 
