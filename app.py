@@ -38,11 +38,10 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            fid = str(uuid.uuid4())
             img = cv2.imread(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            maybe[fid] = zernike.create_query(img)
+            maybe[filename] = zernike.create_query(img)
             return redirect(url_for('uploaded_file',
-                                    filename=fid))
+                                    filename=filename))
     return '''
     <!doctype html>
     <title>Upload new File</title>
@@ -55,6 +54,5 @@ def upload_file():
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename): #cv2.imread
-    return str(zernike.test_query(maybe[filename], zernike_database))
-    return send_from_directory(app.config['RESULTS'],
-                               "heysexy.txt")
+    #return str(zernike.test_query(maybe[filename], zernike_database))
+    return send_from_directory(app.config['UPLOAD_FOLDER'],filename)

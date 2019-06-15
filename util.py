@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import pickle
 import math
+from glob import iglob
 
 RESOURCE_PATH = "res/"
 # save and load pickle objects 
@@ -17,14 +18,14 @@ def load_obj(name ):
 # create grayscale image from database image
 def gray( img ):
 	img = img.astype('uint8')
-	return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype('uint8')
+	return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY).astype('uint8')
 
-def load_images(filename = None):
-	if filename: #LLD-icon.hdf5
+def load_images(filename = None, hdf5 = False):
+	if hdf5: #LLD-icon.hdf5
 		hdf5_file = h5py.File(RESOURCE_PATH + filename, 'r')
 		images, labels = (hdf5_file['data'], hdf5_file['labels/resnet/rc_64'])
 		return images
-	return [i for i in map(cv2.imread, iglob('shoes/**/*.jpg', recursive=True)) if i is not None]
+	return [i for i in map(cv2.imread, iglob(RESOURCE_PATH+filename+'/**/*', recursive=True)) if i is not None]
 
 # find max distance given a list of points 
 def find_max( point_list):
