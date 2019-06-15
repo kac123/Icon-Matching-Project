@@ -6,6 +6,7 @@ import cv2
 
 import zernike
 import util
+import plotter
 
 UPLOAD_FOLDER = 'uploads'
 RESULTS = 'results'
@@ -17,6 +18,7 @@ app.config['RESULTS'] = RESULTS
 
 maybe = {}
 zernike_database = util.load_obj('zernike_database_icon_10')
+images = util.load_images("icon_sample")
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -38,8 +40,7 @@ def upload_file():
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            img = cv2.imread(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            maybe[filename] = zernike.create_query(img)
+            run_image(filename)
             return redirect(url_for('uploaded_file',
                                     filename=filename))
     return '''
@@ -54,5 +55,11 @@ def upload_file():
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename): #cv2.imread
-    #return str(zernike.test_query(maybe[filename], zernike_database))
-    return send_from_directory(app.config['UPLOAD_FOLDER'],filename)
+    return send_from_directory(app.config['RESULTS'],filename)
+
+def run_image(filename):
+    img = cv2.imread(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    z = zernike.create_query(img)
+    res = zernike.test_query(z, zernike_database)
+    res = sorted(res, key = lambda tup: tup[1], reverse = True )
+    plotter.plot_results(img, res, images, os.path.join(app.config['RESULTS'], filename))

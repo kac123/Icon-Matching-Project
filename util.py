@@ -7,11 +7,11 @@ from glob import iglob
 
 RESOURCE_PATH = "res/"
 # save and load pickle objects 
-def save_obj(obj, name ):
+def save_obj(obj, name):
     with open(RESOURCE_PATH + name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 		
-def load_obj(name ):
+def load_obj(name):
     with open(RESOURCE_PATH + name + '.pkl', 'rb') as f:
         return pickle.load(f)		
 

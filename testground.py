@@ -1,10 +1,17 @@
 import zernike
 import util
 import cv2
+import plotter
 # import contour
 
+zernike_database = util.load_obj('zernike_database_icon_10')
 images = util.load_images("icon_sample")
+
 img = images[0]
+z = zernike.create_query(images[0])
+res = zernike.test_query(z, zernike_database)
+res = sorted(res, key = lambda tup: tup[1], reverse = True )
+plotter.plot_results(img, res, images, 'results.png')
 
 # img = util.gray(img)
 
