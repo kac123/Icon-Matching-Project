@@ -161,6 +161,7 @@ def fill_in_diagonals(img):
 	return img, rows, cols, min_x, min_y, max_x, max_y
 
 def image_preprocess(img):
+	img = gray(img)
 	rows,cols = img.shape[:2]
 	# create grayscale image and use Canny edge detection
 	cimg = canny(img)	

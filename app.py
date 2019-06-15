@@ -32,8 +32,6 @@ def upload_file():
             flash('No file part')
             return redirect(request.url)
         file = request.files['file']
-        # if user does not select file, browser also
-        # submit an empty part without filename
         if file.filename == '':
             flash('No selected file')
             return redirect(request.url)
@@ -54,7 +52,7 @@ def upload_file():
     '''
 
 @app.route('/uploads/<filename>')
-def uploaded_file(filename): #cv2.imread
+def uploaded_file(filename):
     return send_from_directory(app.config['RESULTS'],filename)
 
 def run_image(filename):

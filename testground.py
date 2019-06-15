@@ -2,16 +2,17 @@ import zernike
 import util
 import cv2
 import plotter
-# import contour
+import combined
+import contour
 
 zernike_database = util.load_obj('zernike_database_icon_10')
 images = util.load_images("icon_sample")
 
-img = images[0]
-z = zernike.create_query(images[0])
-res = zernike.test_query(z, zernike_database)
-res = sorted(res, key = lambda tup: tup[1], reverse = True )
-plotter.plot_results(img, res, images, 'results.png')
+# img = images[0]
+# z = zernike.create_query(images[0])
+# z = zernike.test_query(z, zernike_database)
+# res = combined.test_combined([z])
+# plotter.plot_results(img, res, images)
 
 # img = util.gray(img)
 
@@ -42,13 +43,13 @@ plotter.plot_results(img, res, images, 'results.png')
 # print(zernike.test_query(z, zernike_database))
 
 
-# c = contour.create_query(images[0])
-# print(c)
+c = contour.create_query(images[0])
+print(c)
 
-# contour_database = contour.generate_database(images)
-# util.save_obj(contour_database, 'contour_database_icon_10')
+contour_database = contour.generate_database(images)
+util.save_obj(contour_database, 'contour_database_icon_10')
 
-# print(contour.test_query(c, images, contour_database))
+print(contour.test_query(c, images, contour_database))
 # # contour_database = contour.generate_database(images)
 # # util.save_obj(contour_database, 'contour_database_icon_10')
 

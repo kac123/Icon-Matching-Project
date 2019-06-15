@@ -1,20 +1,20 @@
-def test_combined( weights, method1, method2, method3 = [], method4 = [] ):
+def test_combined(results_list, weights=[]):
+#reults list is a list of result lists [r1, r2, r3...]
+#where each result list is a list of (index, score) tuples
+#assume that each result list is sorted by index ascending
+	if not results_list: #just in case we somehow get an empty resuts list
+		return []
 
-	# check all 3 methods and average the scores 
 	matched_combined = []
-	N = 2
-	if len(method3) > 0:
-		N = N + 1
-	if len(method4) > 0:
-		N = N + 1
-	
-	for w in  range(len(images)):
+	for i_inx in range(len(results_list[0])):
+		score = 0
+		total_weighting = 0
+		for r_inx in range(len(results_list)):
+			weight = weights[r_inx] if r_inx < len(weights) else 1
+			score += weight * results_list[r_inx][i_inx][1]
+			total_weighting += weight
+		score /= total_weighting
+		matched_combined.append((i_inx, score))
 			
-		if N == 3:
-			matched_combined.append( (w, method1[w][1] , method2[w][1], method3[w][1], round(weights[0]* method1[w][1] + weights[1]*method2[w][1] + weights[2]*method3[w][1],1)) )
-		elif N == 2:
-			matched_combined.append( (w, method1[w][1] , method2[w][1], 0, round(weights[0]*method1[w][1] + weights[1]*method2[w][1],1)) )
-		elif N == 4:            
-			matched_combined.append( (w, method1[w][1] , method2[w][1], method3[w][1], method4[w][1], round(weights[0]* method1[w][1] + weights[1]*method2[w][1] + weights[2]*method3[w][1] + weights[3]*method4[w][1],1)) )
-	matched_combined = sorted(matched_combined, key = lambda tup: tup[N+1], reverse = True )	
+	matched_combined = sorted(matched_combined, key = lambda tup: tup[1], reverse = True )	
 	return matched_combined
