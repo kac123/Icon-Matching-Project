@@ -19,9 +19,9 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULTS'] = RESULTS
 
-zernike_database = util.load_obj('zernike_database_icon_10')
-orb_database = util.load_obj('orb_database_icon_10')
-sift_database = util.load_obj('sift_database_icon_10')
+zernike_database = util.load_obj('zernike_database_icon_50')
+orb_database = util.load_obj('orb_database_icon_50')
+sift_database = util.load_obj('sift_database_icon_50')
 images = util.load_images("icon_sample")
 
 def allowed_file(filename):

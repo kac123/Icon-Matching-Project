@@ -7,17 +7,19 @@ import contour
 import orb
 import sift
 
-zernike_database = util.load_obj('zernike_database_icon_10')
-orb_database = util.load_obj('orb_database_icon_10')
-sift_database = util.load_obj('sift_database_icon_10')
+zernike_database = util.load_obj('zernike_database_icon_50')
+orb_database = util.load_obj('orb_database_icon_50')
+sift_database = util.load_obj('sift_database_icon_50')
 images = util.load_images("icon_sample")
-# images = images[:10]
+images = images[:50]
 img = images[0]
 
 # orb_database = orb.generate_database(images)
-# util.save_obj(orb_database, 'orb_database_icon_10')
+# util.save_obj(orb_database, 'orb_database_icon_50')
 # sift_database = sift.generate_database(images)
-# util.save_obj(sift_database, 'sift_database_icon_10')
+# util.save_obj(sift_database, 'sift_database_icon_50')
+# zernike_database = zernike.generate_database(images)
+# util.save_obj(zernike_database, 'zernike_database_icon_50')
 
 
 # s = sift.create_query(img)
