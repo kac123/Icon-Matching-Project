@@ -10,7 +10,7 @@ import sift
 import combined
 import util
 import plotter
-#comment just to git???
+#comment just to gitdg
 UPLOAD_FOLDER = 'uploads'
 RESULTS = 'results'
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
