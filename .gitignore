@@ -4,4 +4,5 @@
 *.jpg
 **/obj
 **/Logs
+**/Training
 **/.ipynb_checkpoints
