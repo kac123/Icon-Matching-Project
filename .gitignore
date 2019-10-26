@@ -2,3 +2,6 @@
 *.hdf5
 *.pyc
 *.jpg
+**/obj
+**/Logs
+**/.ipynb_checkpoints
