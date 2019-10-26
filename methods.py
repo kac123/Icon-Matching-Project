@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import cv2
 import numpy as np
 import math
+import mahotas
+from sklearn.preprocessing import normalize
 
 from icon_util import *
 
@@ -91,7 +93,6 @@ class neural_method(method_base):
         return sim.item()
 
 # orb
-
 class orb_method(method_base):
     orb = cv2.ORB_create()
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -178,15 +179,13 @@ class sift_method(method_base):
 
 
 class zernike_method(method_base):
-
     def create_query(self, img, **kwargs):
-        contours, edges = find_contours(img)
-        try:
-            zernike = mahotas.features.zernike_moments(edges, 16)    
-            zernike = normalize(zernike[:,np.newaxis], axis=0).ravel()
-            return zernike  
-        except:
-            return [0] * 25
+        _, _, min_x, min_y, max_x, max_y, edges1 = image_preprocess(img) 
+        ## create zernike vector 
+        edges2 = edges1[min_y:max_y+1, min_x:max_x+1]
+        edges2 = cv2.resize(edges2, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
+        zernike = mahotas.features.zernike_moments(edges2, 16)  
+        return normalize(zernike[:,np.newaxis], axis=0).ravel()
 
     def compare_queries(self, x,y, **kwargs):
         dot_prod = sum(i[0] * i[1] for i in zip(x, y))

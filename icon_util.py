@@ -253,6 +253,16 @@ def find_contours(img):
         
     return contours, edges2
 
+def image_preprocess(img):
+    img = gray(img)
+    rows,cols = img.shape[:2]
+    # create grayscale image and use Canny edge detection
+    cimg = canny(img)   
+    
+    dcimg, rows, cols, min_x, min_y, max_x, max_y = fill_in_diagonals(cimg)
+    
+    return rows, cols, min_x, min_y, max_x, max_y, dcimg
+
 # functions to save and load databases
 # the advantage of structuring all the methods in a similar way is that we can write looping code like this
 def generate_databases(imgs, method_classes, name):
