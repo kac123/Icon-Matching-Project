@@ -1,0 +1,8 @@
+
+*.hdf5
+*.pyc
+*.jpg
+**/obj
+**/Logs
+**/Training
+**/.ipynb_checkpoints
