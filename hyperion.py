@@ -45,7 +45,7 @@ class hyperpro(dict):
 
 class hyperion():
 	def __init__(self, num_hyperpros=8, num_planes=8):
-		self.pros = [hyperpro() for i in range(num_hyperpros)]
+		self.pros = [hyperpro(planes=num_planes) for i in range(num_hyperpros)]
 
 	def __call__(self, x):
 		ret = set()
