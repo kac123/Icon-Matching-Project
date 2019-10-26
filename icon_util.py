@@ -361,12 +361,12 @@ def run(methods, images, aber=None, candidates=None, weights=[]):
             results.setdefault("rank",[]).append(rank)
             results.setdefault("time",[]).append(time_elapsed)
             # now we store the information for logistic regression
-            scores.setdefault(method.__class__.__name__,[]).append(method_lists[-1])
+            scores.setdefault(method.__class__.__name__,[]).extend([i[1] for i in method_lists[-1]])
 
         # Store which image was the correct one, for use in logistic regression
-        scores.setdefault("labels",[]).append([1 if i == img_idx else 0 for i in candidates])
+        scores.setdefault("labels",[]).extend([1 if i == img_idx else 0 for i in candidates])
         # And also what was the true index, for seperating the training and test sets
-        scores.setdefault("idx",[]).append([img_idx for i in candidates])
+        scores.setdefault("idx",[]).extend([img_idx for i in candidates])
 
         # now it's time for the combined method
         start_time = perf_counter() # this is a timestamp of when we start the method
@@ -410,7 +410,7 @@ def run(methods, images, aber=None, candidates=None, weights=[]):
     log_num = len(glob("Logs/*")) + 1
     results_pd.to_csv ('Logs/results_'+str(log_num)+'.csv', index = None, header=True)
     score_num = len(glob("Training/*")) + 1
-    #scores_pd.to_csv ('Training/results_'+str(score_num)+'.csv', index = None, header=True)
+    scores_pd.to_csv ('Training/results_'+str(score_num)+'.csv', index = None, header=True)
     return results_pd, scores_pd
 
 def chunks(x, n=10):
