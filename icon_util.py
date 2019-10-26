@@ -4,8 +4,9 @@ import pandas as pd
 import cv2
 import math
 import pickle
+import random
 from time import perf_counter
-
+from glob import glob
 
 # the utility functions
  
@@ -325,7 +326,7 @@ def test_combined(methods, weights = []):
     match_combined = sorted(match_combined, key = lambda tup: tup[-1], reverse = True ) # sort by combined score 
     return match_combined
 
-def run(methods, images, aberrations, candidates=None, weights=[]):
+def run(methods, images, aber=None, candidates=None, weights=[]):
     # this version of run builds a dictionary containing stats for each (aberrated) image, rather than just collecting stats
     # in aggregate. This will then be piped into a dataframe so we can get any statistics we want.
     candidates = candidates or range(len(images))
@@ -333,78 +334,75 @@ def run(methods, images, aberrations, candidates=None, weights=[]):
     scores = {} # this dictionary will collect information to run the logistic regression on
     for img_idx in candidates: # run through all the candidates
         img = images[img_idx]
-        if img_idx % 10 == 0:
-            print(img_idx) # this is here so we can tell how far along the run we are
         if img is None: # if on the odd chance some image is missing, skip it
             continue
-        for aber in aberrations: # run through each of the aberrations for the image
-            query_image = aber(img)
-            method_lists = [] # we're going to gather the query lists of each of the methods here so we can combine them later
-            for method_idx, method in enumerate(methods): # try each of the methods
-                start_time = perf_counter() # this is a timestamp of when we start the method
-                xl = method.run_query(query_image, candidates=candidates) # get the scores for all the images in the method's database
-                method_lists.append(xl) # store the unsorted version for easy combining
-                xl = sorted(xl, key = lambda y: y[1], reverse=True) # sort the results by score
-                time_elapsed = perf_counter() - start_time # ending timestamp minus start is the elapsed time
-                score = 0 # once we find the input image, we're gonna put the score of it in here
-                rank = 0 # we're gonna count up to the rank of the input image
-                for hit in xl: # go through all the scores
-                    rank += 1
-                    if hit[0] == img_idx: # stop when we've found the input image
-                        score = hit[1]
-                        break
-                # now we store the data that will become a row of the dataframe
-                # note that results.setdefault("blah", []) will either return results["blah"] if it's not None
-                # or will return [], so we can just .append and not worry about initializing.
-                results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
-                results.setdefault("aberration",[]).append(aber.__name__)
-                results.setdefault("method",[]).append(method.__class__.__name__)
-                results.setdefault("score",[]).append(score)
-                results.setdefault("rank",[]).append(rank)
-                results.setdefault("time",[]).append(time_elapsed)
-                # now we store the information for logistic regression
-                scores.setdefault(method.__class__.__name__,[]).append(method_lists[-1])
-
-            # Store which image was the correct one, for use in logistic regression
-            scores.setdefault("labels",[]).append([1 if i == img_idx else 0 for i in candidates])
-            # And also what was the true index, for seperating the training and test sets
-            scores.setdefault("idx",[]).append([img_idx for i in candidates])
-
-            # now it's time for the combined method
+        query_image = aber(img) if aber is not None else img
+        method_lists = [] # we're going to gather the query lists of each of the methods here so we can combine them later
+        for method_idx, method in enumerate(methods): # try each of the methods
             start_time = perf_counter() # this is a timestamp of when we start the method
-            combined_list = test_combined(method_lists, weights) # this comes out pre-sorted
+            xl = method.run_query(query_image, candidates=candidates) # get the scores for all the images in the method's database
+            method_lists.append(xl) # store the unsorted version for easy combining
+            xl = sorted(xl, key = lambda y: y[1], reverse=True) # sort the results by score
             time_elapsed = perf_counter() - start_time # ending timestamp minus start is the elapsed time
             score = 0 # once we find the input image, we're gonna put the score of it in here
             rank = 0 # we're gonna count up to the rank of the input image
-            for hit in combined_list: # go through all the scores
+            for hit in xl: # go through all the scores
                 rank += 1
                 if hit[0] == img_idx: # stop when we've found the input image
                     score = hit[1]
                     break
-            results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
-            results.setdefault("aberration",[]).append(aber.__name__)
-            results.setdefault("method",[]).append("combined_method")
+            # now we store the data that will become a row of the dataframe
+            # note that results.setdefault("blah", []) will either return results["blah"] if it's not None
+            # or will return [], so we can just .append and not worry about initializing.
+            #results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
+            results.setdefault("aberration",[]).append(aber.__name__ if aber is not None else 'ab_id')
+            results.setdefault("method",[]).append(method.__class__.__name__)
             results.setdefault("score",[]).append(score)
             results.setdefault("rank",[]).append(rank)
             results.setdefault("time",[]).append(time_elapsed)
+            # now we store the information for logistic regression
+            scores.setdefault(method.__class__.__name__,[]).append(method_lists[-1])
 
-            # and again with equal weighting
-            start_time = perf_counter() # this is a timestamp of when we start the method
-            combined_list = test_combined(method_lists) # this comes out pre-sorted
-            time_elapsed = perf_counter() - start_time # ending timestamp minus start is the elapsed time
-            score = 0 # once we find the input image, we're gonna put the score of it in here
-            rank = 0 # we're gonna count up to the rank of the input image
-            for hit in combined_list: # go through all the scores
-                rank += 1
-                if hit[0] == img_idx: # stop when we've found the input image
-                    score = hit[1]
-                    break
-            results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
-            results.setdefault("aberration",[]).append(aber.__name__)
-            results.setdefault("method",[]).append("uwcombined_method")
-            results.setdefault("score",[]).append(score)
-            results.setdefault("rank",[]).append(rank)
-            results.setdefault("time",[]).append(time_elapsed)
+        # Store which image was the correct one, for use in logistic regression
+        scores.setdefault("labels",[]).append([1 if i == img_idx else 0 for i in candidates])
+        # And also what was the true index, for seperating the training and test sets
+        scores.setdefault("idx",[]).append([img_idx for i in candidates])
+
+        # now it's time for the combined method
+        start_time = perf_counter() # this is a timestamp of when we start the method
+        combined_list = test_combined(method_lists, weights) # this comes out pre-sorted
+        time_elapsed = perf_counter() - start_time # ending timestamp minus start is the elapsed time
+        score = 0 # once we find the input image, we're gonna put the score of it in here
+        rank = 0 # we're gonna count up to the rank of the input image
+        for hit in combined_list: # go through all the scores
+            rank += 1
+            if hit[0] == img_idx: # stop when we've found the input image
+                score = hit[1]
+                break
+        #results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
+        results.setdefault("aberration",[]).append(aber.__name__ if aber is not None else 'ab_id')
+        results.setdefault("method",[]).append("combined_method")
+        results.setdefault("score",[]).append(score)
+        results.setdefault("rank",[]).append(rank)
+        results.setdefault("time",[]).append(time_elapsed)
+
+        # and again with equal weighting
+        start_time = perf_counter() # this is a timestamp of when we start the method
+        combined_list = test_combined(method_lists) # this comes out pre-sorted
+        time_elapsed = perf_counter() - start_time # ending timestamp minus start is the elapsed time
+        score = 0 # once we find the input image, we're gonna put the score of it in here
+        rank = 0 # we're gonna count up to the rank of the input image
+        for hit in combined_list: # go through all the scores
+            rank += 1
+            if hit[0] == img_idx: # stop when we've found the input image
+                score = hit[1]
+                break
+        #results.setdefault("img_idx",[]).append(img_idx) # note that the image index doesn't matter for statistics
+        results.setdefault("aberration",[]).append(aber.__name__ if aber is not None else 'ab_id')
+        results.setdefault("method",[]).append("uwcombined_method")
+        results.setdefault("score",[]).append(score)
+        results.setdefault("rank",[]).append(rank)
+        results.setdefault("time",[]).append(time_elapsed)
 
     # save everything to file and return the dataframes
     results_pd = pd.DataFrame(data=results)
@@ -412,14 +410,17 @@ def run(methods, images, aberrations, candidates=None, weights=[]):
     log_num = len(glob("Logs/*")) + 1
     results_pd.to_csv ('Logs/results_'+str(log_num)+'.csv', index = None, header=True)
     score_num = len(glob("Training/*")) + 1
-    scores_pd.to_csv ('Training/results_'+str(score_num)+'.csv', index = None, header=True)
+    #scores_pd.to_csv ('Training/results_'+str(score_num)+'.csv', index = None, header=True)
     return results_pd, scores_pd
 
 def chunks(x, n=10):
     for i in range(0, len(x), n):
         yield x[i:i+n]
 
-def run_in_chunks(methods, images, aberrations, weights=[]):
+def run_in_chunks(methods, images, aberrations, weights=[], chunk_size=100):
     candidates = [i for i in range(len(images))]
-    for candidate_chunk in chunks(candidates, 100):
-        pass
+    random.shuffle(candidates)
+    for chunk_num, candidate_chunk in enumerate(chunks(candidates, chunk_size)):
+        print("Chunk: "+str(chunk_num+1))
+        for aber in aberrations:
+            run(methods, images, aber=aber, candidates=candidate_chunk, weights=weights)
