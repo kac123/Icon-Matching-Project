@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 import cv2
@@ -91,6 +92,87 @@ class neural_method(method_base):
         cos = np.dot(v1, v2)
         sim = (cos + 1) * 50
         return sim.item()
+    
+class euclidean_neural_method(method_base):
+    # Load the pretrained model
+    model = models.resnet18(pretrained=True)
+    #strip the final layer to get a feature vector
+    model = nn.Sequential(*list(model.children())[:-1])  
+    # Set model to evaluation mode
+    model.eval()
+    
+    def create_query(self, img, **kwargs):
+        scaler = transforms.Resize((224, 224))
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+            std=[0.229, 0.224, 0.225])
+        to_tensor = transforms.ToTensor()
+        pillize = transforms.ToPILImage()
+        loader = transforms.Compose([pillize, scaler, to_tensor, normalize])
+        l_img = loader(img)
+        t_img = Variable(l_img).unsqueeze(0)
+        f_vec = self.model(t_img).squeeze()
+        n_vec = f_vec.detach().numpy()
+        return n_vec
+    
+    def compare_queries(self, v1, v2, **kwargs):
+        sim = 1.0/(np.linalg.norm(v1-v2)+1e-3)
+        return sim
+    
+class trained_neural_method(neural_dist_method):
+    model = models.resnet18()
+    model.fc = nn.Linear(512,512)
+    model.load_state_dict(torch.load("models/IconResnet.pt"))
+    model.eval()
+
+class small_neural_method(method_base):
+    # this is the definition of the custom neural network
+    class IconEmbeddingNet(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.convnet = nn.Sequential(
+                nn.Conv2d(3, 32, 5),
+                nn.PReLU(),
+                nn.MaxPool2d(2, stride=2),
+                nn.Conv2d(32, 64, 5),
+                nn.PReLU(),
+                nn.MaxPool2d(2, stride=2))
+            self.fc = nn.Sequential(
+                nn.Linear(64 * 4 * 4, 256),
+                nn.PReLU(),
+                nn.Linear(256, 256),
+                nn.PReLU(),
+                nn.Linear(256, 8)
+                )
+        def forward(self, x):
+            output = self.convnet(x)
+            output = output.view(output.size()[0], -1)
+            output = self.fc(output)
+            return output
+
+        def get_embedding(self, x):
+            return self.forward(x)
+        
+    model = IconEmbeddingNet()
+    model.load_state_dict(torch.load("models/IconEmbeddingNet.pt"))
+    model.eval()
+    
+    def create_query(self, img, **kwargs):
+        scaler = transforms.Resize((28, 28))
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+            std=[0.229, 0.224, 0.225])
+        to_tensor = transforms.ToTensor()
+        pillize = transforms.ToPILImage()
+        loader = transforms.Compose([pillize, scaler, to_tensor, normalize])
+        l_img = loader(img)
+        t_img = Variable(l_img).unsqueeze(0)
+        f_vec = self.model(t_img).squeeze()
+        n_vec = f_vec.detach().numpy()
+        return n_vec
+
+    def compare_queries(self, v1, v2, **kwargs):
+        sim = 1.0/(np.linalg.norm(v1-v2)+1e-3)
+        return sim
+    
 
 # orb
 class orb_method(method_base):
@@ -189,7 +271,7 @@ class zernike_method(method_base):
 
     def compare_queries(self, x,y, **kwargs):
         dot_prod = sum(i[0] * i[1] for i in zip(x, y))
-        return round(666.667 * (dot_prod - .850),1) 
+        return 50.0 * (dot_prod + 1.0) 
 
 
 class contour_method(method_base):

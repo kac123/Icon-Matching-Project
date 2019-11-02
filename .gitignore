@@ -3,6 +3,6 @@
 *.pyc
 *.jpg
 **/obj
-**/Logs
+**/Logs*
 **/Training
 **/.ipynb_checkpoints
