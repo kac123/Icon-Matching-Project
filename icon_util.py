@@ -342,7 +342,11 @@ def run(methods, images, aber=None, candidates=None, weights=[]):
     candidates = candidates or range(len(images))
     results = {} # this dictionary will be used to collect results to log
     scores = {} # this dictionary will collect information to run the logistic regression on
+    imgs_so_far = 0 # just to keep track of progress
     for img_idx in candidates: # run through all the candidates
+        if imgs_so_far % 10 == 0:
+            print(imgs_so_far)
+        imgs_so_far += 1
         img = images[img_idx]
         if img is None: # if on the odd chance some image is missing, skip it
             continue

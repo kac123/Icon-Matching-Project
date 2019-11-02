@@ -115,13 +115,13 @@ class euclidean_neural_method(method_base):
         return n_vec
     
     def compare_queries(self, v1, v2, **kwargs):
-        sim = 1.0/(np.linalg.norm(v1-v2)+1e-3)
+        sim = 100/(np.linalg.norm(v1-v2)+1)
         return sim
     
-class trained_neural_method(neural_dist_method):
+class trained_neural_method(euclidean_neural_method):
     model = models.resnet18()
-    model.fc = nn.Linear(512,512)
-    model.load_state_dict(torch.load("models/IconResnet.pt"))
+    model.fc = nn.Linear(512,8)
+    model.load_state_dict(torch.load("models/EmbeddingIconResnet.pt"))
     model.eval()
 
 class small_neural_method(method_base):
@@ -170,7 +170,7 @@ class small_neural_method(method_base):
         return n_vec
 
     def compare_queries(self, v1, v2, **kwargs):
-        sim = 1.0/(np.linalg.norm(v1-v2)+1e-3)
+        sim = 100.0/(np.linalg.norm(v1-v2)+1)
         return sim
     
 
