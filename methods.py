@@ -173,6 +173,64 @@ class small_neural_method(method_base):
         sim = 100.0/(np.linalg.norm(v1-v2)+1)
         return sim
     
+class shoe_neural_method(method_base):
+    # this is the definition of the custom neural network
+    class ShoeEmbeddingNet(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.convnet = nn.Sequential(
+                nn.Conv2d(3, 32, 5),
+                nn.PReLU(),
+                nn.MaxPool2d(2, stride=2),
+                nn.Conv2d(32, 64, 5),
+                nn.PReLU(),
+                nn.MaxPool2d(2, stride=2))
+            self.encoder = nn.Sequential(
+                nn.Linear(64 * 5 * 5, 256),
+                nn.PReLU(),
+                nn.Linear(256, 256),
+                nn.PReLU(),
+                nn.Linear(256, 256)
+                )
+            self.decoder = nn.Sequential(
+                nn.Linear(256, 512),
+                nn.PReLU(),
+                nn.Linear(512, 1024),
+                nn.PReLU(),
+                nn.Linear(1024, 32 * 32 * 3),
+                nn.Sigmoid())
+
+        def forward(self, x):
+            x = self.convnet(x)
+            x = x.view(x.size()[0], -1)
+            x = self.encoder(x)
+            #y = self.decoder(x)
+            return x
+
+        def get_embedding(self, x):
+            return self.forward(x)
+        
+    model = ShoeEmbeddingNet()
+    model.load_state_dict(torch.load("models/shoes_autoencoder.pth"))
+    model.eval()
+    
+    def create_query(self, img, **kwargs):
+        scaler = transforms.Resize((32, 32))
+        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
+            std=[0.229, 0.224, 0.225])
+        to_tensor = transforms.ToTensor()
+        pillize = transforms.ToPILImage()
+        loader = transforms.Compose([pillize, scaler, to_tensor, normalize])
+        l_img = loader(img)
+        t_img = Variable(l_img).unsqueeze(0)
+        f_vec = self.model(t_img).squeeze()
+        n_vec = f_vec.detach().numpy()
+        return n_vec
+
+    def compare_queries(self, v1, v2, **kwargs):
+        sim = 100.0/(np.linalg.norm(v1-v2)+1)
+        return sim
+    
 
 # orb
 class orb_method(method_base):
