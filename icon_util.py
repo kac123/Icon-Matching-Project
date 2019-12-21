@@ -7,6 +7,7 @@ import pickle
 import random
 from time import perf_counter
 from glob import glob
+import os
 
 # the utility functions
  
@@ -336,7 +337,7 @@ def test_combined(methods, weights = []):
     match_combined = sorted(match_combined, key = lambda tup: tup[-1], reverse = True ) # sort by combined score 
     return match_combined
 
-def run(methods, images, aber=None, candidates=None, weights=[]):
+def run(methods, images, aber=None, candidates=None, weights=[], logdir = "Logs"):
     # this version of run builds a dictionary containing stats for each (aberrated) image, rather than just collecting stats
     # in aggregate. This will then be piped into a dataframe so we can get any statistics we want.
     candidates = candidates or range(len(images))
@@ -421,8 +422,8 @@ def run(methods, images, aber=None, candidates=None, weights=[]):
     # save everything to file and return the dataframes
     results_pd = pd.DataFrame(data=results)
     scores_pd = pd.DataFrame(data=scores)
-    log_num = len(glob("Logs/*")) + 1
-    results_pd.to_csv ('Logs/results_'+str(log_num)+'.csv', index = None, header=True)
+    log_num = len(glob(logdir+"/*")) + 1
+    results_pd.to_csv (logdir+'/results_'+str(log_num)+'.csv', index = None, header=True)
     score_num = len(glob("Training/*")) + 1
     scores_pd.to_csv ('Training/results_'+str(score_num)+'.csv', index = None, header=True)
     return results_pd, scores_pd
@@ -431,10 +432,12 @@ def chunks(x, n=10):
     for i in range(0, len(x), n):
         yield x[i:i+n]
 
-def run_in_chunks(methods, images, aberrations, weights=[], chunk_size=100):
+def run_in_chunks(methods, images, aberrations, weights=[], chunk_size=100, logdir = "Logs"):
+    if not os.path.exists(logdir):
+        os.mkdir(logdir)
     candidates = [i for i in range(len(images))]
     random.shuffle(candidates)
     for chunk_num, candidate_chunk in enumerate(chunks(candidates, chunk_size)):
         print("Chunk: "+str(chunk_num+1))
         for aber in aberrations:
-            run(methods, images, aber=aber, candidates=candidate_chunk, weights=weights)
+            run(methods, images, aber=aber, candidates=candidate_chunk, weights=weights, logdir=logdir)

@@ -184,20 +184,23 @@ class shoe_neural_method(method_base):
                 nn.MaxPool2d(2, stride=2),
                 nn.Conv2d(32, 64, 5),
                 nn.PReLU(),
+                nn.MaxPool2d(2, stride=2),
+                nn.Conv2d(64, 128, 5),
+                nn.PReLU(),
                 nn.MaxPool2d(2, stride=2))
             self.encoder = nn.Sequential(
-                nn.Linear(64 * 5 * 5, 256),
+                nn.Linear(2048, 1024),
                 nn.PReLU(),
-                nn.Linear(256, 256),
+                nn.Linear(1024, 512),
                 nn.PReLU(),
-                nn.Linear(256, 256)
+                nn.Linear(512, 256)
                 )
             self.decoder = nn.Sequential(
                 nn.Linear(256, 512),
                 nn.PReLU(),
                 nn.Linear(512, 1024),
                 nn.PReLU(),
-                nn.Linear(1024, 32 * 32 * 3),
+                nn.Linear(1024, 64 * 64 * 3),
                 nn.Sigmoid())
 
         def forward(self, x):
@@ -215,7 +218,7 @@ class shoe_neural_method(method_base):
     model.eval()
     
     def create_query(self, img, **kwargs):
-        scaler = transforms.Resize((32, 32))
+        scaler = transforms.Resize((64, 64))
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
             std=[0.229, 0.224, 0.225])
         to_tensor = transforms.ToTensor()
