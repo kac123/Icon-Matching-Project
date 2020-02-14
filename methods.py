@@ -10,6 +10,7 @@ import numpy as np
 import math
 import mahotas
 from sklearn.preprocessing import normalize
+from sklearn.decomposition import PCA
 
 from icon_util import *
 
@@ -63,6 +64,66 @@ class method_base(object):
                 print(img_index)
             img = images[img_index]
             self.database[img_index] = self.create_query(img, **kwargs)
+        return self.database
+    
+   
+class spca_method(method_base):
+    # this is the definition of the self pca base method
+    pca_size=2
+    
+    def mod_img(self, img):
+        return img.reshape(3,-1)
+    
+    def fix_query(self, q):
+        return q.reshape(1,-1)[0] / (0.01 + np.linalg.norm(q))
+    
+    def create_query(self, img, **kwargs):
+        pca = PCA(self.pca_size)
+        proj = pca.fit_transform(self.mod_img(img))
+        return self.fix_query(proj)
+
+    def compare_queries(self, v1, v2, **kwargs):
+        sim = 100.0/(np.linalg.norm(v1-v2)+1)
+        return sim
+    
+class horizontal_pca_method(spca_method):
+    pca_size = 16
+    def mod_img(self, img):
+        return img.reshape(-1,img.shape[0]*img.shape[-1])
+    
+class vertical_pca_method(spca_method):
+    pca_size = 16
+    def mod_img(self, img):
+        return np.concatenate(img, axis=1)
+    
+class color_channel_pca_method(spca_method):
+    def mod_img(self, img):
+        return img.reshape(-1,img.shape[-1]).T
+
+
+class pca_method(method_base):
+    # this is the definition of the custom neural network
+    pca=None
+    
+    def create_query(self, img, **kwargs):
+        t_img = img.reshape(1,-1) / (0.01 + np.linalg.norm(img)) 
+        t_img = self.pca.transform(t_img)
+        return t_img
+
+    def compare_queries(self, v1, v2, **kwargs):
+        sim = 100.0/(np.linalg.norm(v1-v2)+1)
+        return sim
+
+    # Make and store image descriptors for every given image.
+    def generate_database(self, images, **kwargs):
+        self.database  = {}
+        self.pca = PCA(32)
+        images = np.array(images)
+        images = images.reshape(-1, images[0].size)
+        images = images / (0.01 + np.linalg.norm(images, axis=1)[:,np.newaxis]) 
+        proj = self.pca.fit_transform(images)
+        for i in range(len(images)):
+            self.database[i] = proj[i]
         return self.database
 
 # neural
@@ -255,7 +316,7 @@ class orb_method(method_base):
             return 0
         try:
             matches = self.matcher.match(img_kp1,img_kp2)
-            score = len(matches)
+            score = 100.0 * len(matches) / min(len(img_kp1), len(img_kp2))
             return score
         except:
             return 0
@@ -306,7 +367,7 @@ class sift_method(method_base):
             for i,(m,n) in enumerate(matches):
                 if m.distance < 0.7*n.distance:
                     score += 1
-            return score
+            return 100.0 * score / min(len(img_kp1), len(img_kp2))
         except:
             return 0
 

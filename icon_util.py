@@ -8,8 +8,29 @@ import random
 from time import perf_counter
 from glob import glob
 import os
+from scipy.interpolate import griddata
+import matplotlib.pyplot as plt
 
 # the utility functions
+
+def plot_1d(x,y, title=None):
+    plt.plot(x, y)
+    if title:
+        plt.title(title)
+    plt.show()
+
+def heatmap_2d(x,y,z, title=None):
+    xi = np.linspace(np.amin(x),np.amax(x),1000)
+    yi = np.linspace(np.amin(y),np.amax(y),1000)
+    # grid the data.
+    zi = griddata((x, y), z, (xi[None,:], yi[:,None]), method='cubic')
+    # contour the gridded data
+    CS = plt.contour(xi,yi,zi,15,linewidths=0.5,colors='k')
+    CS = plt.contourf(xi,yi,zi,15,cmap=plt.cm.jet)
+    plt.colorbar() # draw colorbar
+    if title:
+        plt.title(title)
+    plt.show()
  
 def save_obj(obj, name ):
     # save pickle objects
