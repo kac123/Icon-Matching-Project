@@ -11,6 +11,8 @@ import math
 import mahotas
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import PCA
+import imagehash
+from PIL import Image
 
 from icon_util import *
 
@@ -28,12 +30,12 @@ class method_base(object):
     # Take in an image and return its descriptor calculated by the method.
     # Each method will override this.
     def create_query(self, img, **kwargs):
-        return 1
+        return 0
 
     # Take in two descriptors and say how similar they are.
     # Each method will override this.
     def compare_queries(self, v1, v2, **kwargs):
-        return 1
+        return 0
 
     # If the method needs to normalize its results somehow, do that by
     # overriding this function.
@@ -65,6 +67,31 @@ class method_base(object):
             img = images[img_index]
             self.database[img_index] = self.create_query(img, **kwargs)
         return self.database
+
+    
+class ahash_method(method_base):
+    def create_query(self, img, **kwargs):
+        return imagehash.average_hash(Image.fromarray(img))
+    def compare_queries(self, v1, v2, **kwargs):
+        return 100-(v1-v2)
+    
+class dhash_method(method_base):
+    def create_query(self, img, **kwargs):
+        return imagehash.dhash(Image.fromarray(img))
+    def compare_queries(self, v1, v2, **kwargs):
+        return 100-(v1-v2)
+    
+class phash_method(method_base):
+    def create_query(self, img, **kwargs):
+        return imagehash.phash(Image.fromarray(img))
+    def compare_queries(self, v1, v2, **kwargs):
+        return 100-(v1-v2)
+    
+class whash_method(method_base):
+    def create_query(self, img, **kwargs):
+        return imagehash.whash(Image.fromarray(img))
+    def compare_queries(self, v1, v2, **kwargs):
+        return 100-(v1-v2)
     
    
 class spca_method(method_base):

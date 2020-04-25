@@ -292,14 +292,13 @@ def generate_databases(imgs, method_classes, name):
         method = method_c() # create the method by instancing the class
         db = method.generate_database(imgs) # generate the database from the images
         filename = "db_"+method.__class__.__name__+"_"+name # this is what the database file should be called
-        save_obj(db, filename) # save it
+        save_obj(method, filename) # save it
         
 def load_databases(method_classes, name):
     loaded_methods = [] # list of loaded methods to return
     for method_c in method_classes: # for each method class
         filename = "db_"+method_c.__name__+"_"+name # this is what the database file should be called
-        db = load_obj(filename) # load the database file
-        method = method_c(db) # construct the instance of the method class using the database
+        method = load_obj(filename) # load the database file
         loaded_methods.append(method) # add it to the list of methods to return
     return loaded_methods
 
