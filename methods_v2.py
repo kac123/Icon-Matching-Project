@@ -11,7 +11,7 @@ import math
 import mahotas
 from sklearn.preprocessing import normalize
 
-from icon_util import *
+from icon_util_v2 import *
 
 class method_base(object):
     # base class that all methods inherit from
@@ -276,11 +276,17 @@ class zernike_method(method_base):
 
 class contour_method(method_base):
     
-	#fractions = [.1,.2,.3,.4,.5,.6,.7,.8,.9]    
+    #fractions = [.1,.2,.3,.4,.5,.6,.7,.8,.9]    
     fractions = [.05,.1,.15,.2,.25,.3,.35,.4,.45,.5,.55,.6,.65,.7,.75,.8,.85,.9,.95]
 
     def create_query(self, img, fractions=None, **kwargs):
-        rows,cols = img.shape[:2]
+
+        rows, cols = img.shape[:2]
+        if rows < 130:
+            img = prep_img(img)
+
+        rows, cols = img.shape[:2]    
+
         contours, edges = find_contours(img)
         dist_append = []
         
@@ -332,9 +338,11 @@ class contour_method(method_base):
 
                     # distance between middle point and intersect points, normalize using length of longest line
                     dist = [ round( math.sqrt( (i[0] - pt[0])**2 + (i[1] - pt[1])**2 ) / max_dist , 3 ) for i in intersect ]
-                    for d in dist:
-                        if (n,fractions[m],d) not in dist_append:
-                            dist_append.append((n,fractions[m],d))
+                    split = [split_contour(i[0],i[1],pt[0],pt[1]) for i in intersect]
+
+                    for d in range(0,len(dist)):
+                        if (n+split[d],fractions[m],dist[d]) not in dist_append:
+                            dist_append.append((n+split[d],fractions[m],dist[d]))
 
                 # find midway points along second best line segment  
                 if n <= 1 and ratio_dist >= .988:
@@ -357,9 +365,10 @@ class contour_method(method_base):
 
                             # distance between middle point and intersect points, normalize using length of longest line
                             dist = [ round( math.sqrt( (i[0] - pt[0])**2 + (i[1] - pt[1])**2 ) / second_dist , 2 ) for i in intersect ]
-                            for d in dist:
-                                if (5,fractions[m],d) not in dist_append:
-                                    dist_append.append((5,fractions[m],d))              
+                            split = [split_contour(i[0],i[1],pt[0],pt[1]) for i in intersect]
+                            for d in range(0,len(dist)):
+                                if (5+split[d],fractions[m],dist[d]) not in dist_append:
+                                    dist_append.append((5+split[d],fractions[m],dist[d]))              
 
         ## create final dictionary for contour method distances    
         query = {}        
@@ -368,38 +377,37 @@ class contour_method(method_base):
 
         return query         
 
-    def compare_queries(self, query1, query2, error=0.05, fractions=None, **kwargs):
+    def compare_queries(self, query1, query2, error=0.1, fractions=None, **kwargs):
         fractions = fractions or self.fractions       
-        all_scores = []
         exclude_circle = []
 
-        for n in [0,5]:
+        # check if outer contour is circular
+        for n in [0,0.5,5,5.5]:
             scores_circle = []
             for f in fractions:
                 diff_circle = []
                 for dist in query1.get(str((n,f)) , []):
-                    if f > 0.5:
-                        f1 = (f - 0.5) * 2
-                    else:
-                        f1 = f * 2
-                    
+                    f1 = 2*abs(0.5 - f)                    
                     diff_circle1 = abs(dist - np.sin(np.arccos(f1))/2)
                     if dist > 0 :
                         diff_circle.append(diff_circle1)
                 diff_circle.sort()
                 if len(diff_circle) >= 1:
-                    partial_score_circle = max(100 - diff_circle[0]*100/.02 , 0)
+                    partial_score_circle = max(100 - diff_circle[0]*100/error , 0)
                 else:
                     partial_score_circle = 0
                 scores_circle.append(partial_score_circle)
 
             final_score_circle = sum(scores_circle)/len(scores_circle)
-            if final_score_circle > 90:
+            if final_score_circle >= 90:
                 exclude_circle.append(n)
-        
-        for n in range(0,6):  
-            if n not in exclude_circle:
-                for m in range(0,6):
+ 
+        # compare each contour between query and database image, exclude outer circle 
+        contour_matrix = []
+        for n in frange(0,6,0.5):
+            temp_matrix = []
+            if n not in exclude_circle:             
+                for m in frange(0,6,0.5):
                     scores = []
                     for f in fractions:          
                         diff = []
@@ -410,19 +418,74 @@ class contour_method(method_base):
                                     diff.append(diff1)
                         if len(diff) == 1:
                             partial_score = max(100 - diff[0]*100/error , 0)
-                        elif len(diff) > 1:
+                        elif len(diff) == 2:
                             diff.sort()
                             partial_score = max(100 - diff[0]*50/error - diff[1]*50/error, 0)
+                        elif len(diff) > 2:
+                            partial_score = max(100 - diff[0]*33.33/error - diff[1]*33.333/error - diff[2]*33.33/error, 0)
                         else:
                             partial_score = 0
                         scores.append(partial_score)
-                    all_scores.append( sum(scores)/len(scores) )
-        
-        all_scores.sort(reverse=True)
-        if len(all_scores) > 5:
-            final_score = sum(all_scores[:5])/5
-        elif len(all_scores) > 0:
+                        
+                    temp_matrix.append( round(sum(scores)/len(scores),3))
+                    
+            contour_matrix.append(temp_matrix)
+
+        all_scores = []
+        for i in range(len(contour_matrix)):
+            try:
+                temp = max(contour_matrix[i])
+            except:
+                temp = 0
+            all_scores.append(temp)  
+            
+        if len(all_scores) > 0:
             final_score = sum(all_scores)/len(all_scores)
         else:
             final_score = 0
-        return final_score
+
+            
+
+        # compare each contour between query and reversed database image, exclude outer circle
+        contour_matrix = []
+        for n in frange(0,6,0.5):  
+            temp_matrix = []
+            if n not in exclude_circle:
+                for m in frange(0,6,0.5):
+                    scores = []
+                    for f in fractions:          
+                        diff = []
+                        for dist in query1.get(str((n,f)) , []):
+                            for query_dist in query2.get(str((m,(1-f))) , []):
+                                diff1 = abs(dist - query_dist)
+                                if dist > 0 and query_dist > 0:
+                                    diff.append(diff1)
+                        if len(diff) == 1:
+                            partial_score = max(100 - diff[0]*100/error , 0)
+                        elif len(diff) == 2:
+                            diff.sort()
+                            partial_score = max(100 - diff[0]*50/error - diff[1]*50/error, 0)
+                        elif len(diff) > 2:
+                            partial_score = max(100 - diff[0]*33.33/error - diff[1]*33.333/error - diff[2]*33.33/error, 0)
+                        else:
+                            partial_score = 0
+                        scores.append(partial_score)
+                        
+                    temp_matrix.append( round(sum(scores)/len(scores),3))
+                    
+            contour_matrix.append(temp_matrix)
+
+        all_scores = []
+        for i in range(len(contour_matrix)):
+            try:
+                temp = max(contour_matrix[i])
+            except:
+                temp = 0
+            all_scores.append(temp)  
+            
+        if len(all_scores) > 0:
+            reverse_score = sum(all_scores)/len(all_scores)
+        else:
+            reverse_score = 0
+           
+        return max(final_score, reverse_score)

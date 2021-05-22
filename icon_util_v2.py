@@ -34,20 +34,39 @@ def gray( img ):
         img = np.dot( np.transpose( img, (1,2,0)), [0.299, 0.587, 0.114] )
     return img.astype(np.uint8)
 
-def add_border(img):
-    rows,cols = img.shape
+def add_border(img, size):
+    rows,cols = img.shape[:2]
     firstcol = img[:,0]
     lastcol = img[:,cols-1]
     firstrow = img[0,:]
     lastrow = img[rows-1,:]
     border = list(np.concatenate((firstcol,lastcol,firstrow,lastrow)))
-    common = int(max(set(border), key = border.count))
-    array = cv2.copyMakeBorder( img,  10, 10, 10, 10, cv2.BORDER_CONSTANT, value =  common)
+    try:
+        common = int(max(set(border), key = border.count))
+        array = cv2.copyMakeBorder( img,  size, size, size, size, cv2.BORDER_CONSTANT, value =  common)
+    except:
+        common = sstats.mode(border)[0][0] # get the most common color
+        common = tuple(map(int, common)) # convert to a tuple of ints to pass as color
+        array = cv2.copyMakeBorder( img,  size, size, size, size, cv2.BORDER_CONSTANT, value =  common)
+
     return array.astype(np.uint8)
+    
+def image_preprocess(img):
+    img = gray(img)
+    rows,cols = img.shape[:2]
+    # create grayscale image and use Canny edge detection
+    cimg = canny(img)   
+    
+    dcimg, rows, cols, min_x, min_y, max_x, max_y = fill_in_diagonals(cimg)
+    
+    return rows, cols, min_x, min_y, max_x, max_y, dcimg    
 
 def prep_img(img):
     img = gray(img)
-    img = add_border(img)
+    img = add_border(img, 16)
+    rows,cols = img.shape[:2]
+    scale = (128 / max(rows,cols))
+    img = cv2.resize(img,  (int(rows * scale), int(cols * scale)))    
     return img
 
 def adjust_gamma(image, gamma=1.0):
@@ -169,15 +188,38 @@ def find_intersect( x1, y1, x2, y2):
 
     return intersect
 
+def split_contour(x_cnt, y_cnt, x_mid, y_mid):
+    
+    if x_cnt > x_mid:
+        return 0
+    elif x_cnt == x_mid and y_cnt > y_mid:
+        return 0
+    else:
+        return 0.5
+    
+def frange(start, stop, step):
+    i = start
+    while i < stop:
+        if i == int(i):
+            i = int(i)
+        yield i
+        i += step
+
+
 def canny(img):
-    cimg = cv2.Canny(img,100,200)
-    if np.amax(cimg,axis=(0,1)) == 0:
-        cimg = cv2.Canny(img,20,100)
-    if np.amax(cimg,axis=(0,1)) == 0:
-        cimg = cv2.Canny(img,5,20)
-    if np.amax(cimg,axis=(0,1)) == 0:
-        cimg = cv2.Canny(img,1,5)   
-    return cimg
+    
+    threshhold = [20,60,120, 200]
+    pixel_count = []
+    
+    for t in range(0,len(threshhold)-1):
+    
+        edges1 = cv2.Canny(img,threshhold[t],threshhold[t+1])
+        pixel_count_temp = np.sum(np.array(edges1) >= 200)
+        pixel_count.append(pixel_count_temp)
+        
+    t_max = pixel_count.index(max(pixel_count))
+    edges1 = cv2.Canny(img,threshhold[t_max],threshhold[t_max+1])    
+    return edges1
 
 def fill_in_diagonals(img):
     rows,cols = img.shape[:2]
@@ -223,63 +265,49 @@ def edge_detect( img ):
 
 def find_contours(img):
 
-    # resize image by longest dimension to 128 
-    rows,cols = img.shape[:2]
-    scale = int(128 / max(rows,cols))
-    img = cv2.resize(img,  (rows * scale, cols * scale))
-
-    img_gamma = adjust_gamma(img, .33)
-
-    # create grayscale image and use Canny edge detection
-    edges1, edges2 = edge_detect(img)
-    edges_gamma, edges2_gamma = edge_detect(img_gamma) 
+    gamma_list = [0.2, 0.33, 0.5, 1, 1.5, 3, 5]
+    perimeter_list = []
     
-    # use ellipse dilation to fill the gaps in countours  
+    for g in range(0,len(gamma_list)):
+
+        img_gamma = adjust_gamma(img, gamma_list[g])
+    
+        # create grayscale image and use Canny edge detection
+        edges_gamma, edges2_gamma = edge_detect(img_gamma) 
+        
+        # use ellipse dilation to fill the gaps in countours  
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+        edges_gamma = cv2.dilate(edges_gamma, kernel)
+        edges2_gamma = cv2.dilate(edges2_gamma, kernel)
+        
+        # find contours from edge image    
+        try:
+            contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
+        except:
+            image, contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
+            
+        # use 10 biggest countours      
+        contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:5]  
+        total_perimeter_gamma = 0
+        for n, contour_g in enumerate(contours_gamma):
+            total_perimeter_gamma += cv2.arcLength(contour_g,False)   
+
+        perimeter_list.append(total_perimeter_gamma)  
+        
+    g_max = perimeter_list.index(max(perimeter_list))   
+    img_gamma = adjust_gamma(img, gamma_list[g_max]) 
+    edges_gamma, edges2_gamma = edge_detect(img_gamma)
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-    edges1 = cv2.dilate(edges1, kernel)
-    edges2 = cv2.dilate(edges2, kernel)
     edges_gamma = cv2.dilate(edges_gamma, kernel)
-    edges2_gamma = cv2.dilate(edges2_gamma, kernel)
-    
-    # find contours from edge image
-    try:
-        image, contours, hierarchy = cv2.findContours(edges1,cv2.RETR_LIST,cv2.CHAIN_APPROX_NONE)
-    except:
-        contours, hierarchy = cv2.findContours(edges1,cv2.RETR_LIST,cv2.CHAIN_APPROX_NONE)
-    
     try:
         contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
     except:
         image, contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
-          
-     # use 10 biggest countours      
-    contours = sorted(contours, key = lambda x:cv2.contourArea(x), reverse = True)[:5]
-    contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:5]          
-    
-     # check if gamma correction results in longer contours 
-    total_perimeter = 0
-    for n, contour in enumerate(contours):
-        total_perimeter += cv2.arcLength(contour,False)
-        
-    total_perimeter_gamma = 0
-    for n, contour_g in enumerate(contours_gamma):
-        total_perimeter_gamma += cv2.arcLength(contour_g,False)  
-        
-    if total_perimeter_gamma >= 1.1 * total_perimeter:
-        contours = contours_gamma
-        edges2 = edges2_gamma
-        
-    return contours, edges2
+            
+    contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:5]  
+      
+    return contours_gamma, edges2_gamma
 
-def image_preprocess(img):
-    img = gray(img)
-    rows,cols = img.shape[:2]
-    # create grayscale image and use Canny edge detection
-    cimg = canny(img)   
-    
-    dcimg, rows, cols, min_x, min_y, max_x, max_y = fill_in_diagonals(cimg)
-    
-    return rows, cols, min_x, min_y, max_x, max_y, dcimg
 
 # functions to save and load databases
 # the advantage of structuring all the methods in a similar way is that we can write looping code like this
@@ -402,6 +430,7 @@ def run(methods, images, aber=None, candidates=None, weights=[], queries=None):
         img = images[img_idx]
         if img is None: # if on the odd chance some image is missing, skip it
             continue
+        img = prep_img(img)
         query_image = aber(img) if aber is not None else img
         method_lists = [] # we're going to gather the query lists of each of the methods here so we can combine them later
         for method_idx, method in enumerate(methods): # try each of the methods
