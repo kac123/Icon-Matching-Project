@@ -17,6 +17,9 @@ class method_base(object):
     # base class that all methods inherit from
     # this is just to avoid having to rewrite all the stuff that is the same between
     # the various methods
+    
+    def name(self):
+        return "Base"
 
     # The database stores the image descriptors for all the known images,
     # indexed by the image index.
@@ -64,6 +67,236 @@ class method_base(object):
             img = images[img_index]
             self.database[img_index] = self.create_query(img, **kwargs)
         return self.database
+    
+class split_method(method_base):
+    # wrapper around a method to enable it to work with the constituent shapes of an image
+    def name(self):
+        return "Split_" + str(self.split_params)+ "_" + self.method.name()
+        
+    def split_image0(self,img):
+        img=prep_img(img, False)
+        contours,edges=find_contours(img)
+        hulls=[cv2.convexHull(c) for c in contours if len(c)>2]
+        blanks=[np.zeros(img.shape, np.uint8) for h in hulls]
+        blanks=[cv2.drawContours(b, np.array([np.squeeze(h)]), -1, (255,255,255), cv2.FILLED)[...,::-1] for h,b in zip(hulls,blanks)]
+        idxs=[b!=255 for b in blanks]
+        splits=[img.copy() for b in blanks]
+        for s,i in zip(splits,idxs):
+            s[i]=0
+        return splits
+    
+    def split_image1(self,img):
+        img=prep_img(img, False)
+        contours,edges=find_contours(img)
+        crops = []
+        for idx in range(len(contours)):  
+            mask = np.zeros_like(img) # Create mask where white is what we want, black otherwise
+            cv2.drawContours(mask, contours, idx, (255,255,255), -1) # Draw filled contour in mask
+
+            # Now crop
+            (y, x, z) = np.where(mask == 255)
+            (topy, topx) = (np.min(y), np.min(x))
+            (bottomy, bottomx) = (np.max(y), np.max(x))
+            print(bottomx, topx, bottomy, topy)
+            out = img[topy:bottomy+1, topx:bottomx+1]
+            print(out.shape)
+            try:
+                out = cv2.resize(out,img.shape[:-1],interpolation=cv2.INTER_AREA)
+                print(out.shape)
+                crops.append(out)
+            except:
+                pass
+        return crops
+    
+    def split_image2(self,img):
+        img=prep_img(img, False)
+        simg = gaussian_filter(oimg, sigma=2)
+
+        X = np.reshape(simg, (-1, 1))
+        connectivity = grid_to_graph(*simg.shape)
+
+        n_clusters = 5  # number of regions
+        ward = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward',
+                                       connectivity=connectivity)
+        ward.fit(X)
+        label = np.reshape(ward.labels_, simg.shape)
+
+        crops=[]
+        for l in range(n_clusters):
+            x,y=np.where(label == l)
+            (topy, topx) = (np.min(y), np.min(x))
+            (bottomy, bottomx) = (np.max(y), np.max(x))
+            print(bottomx, topx, bottomy, topy)
+            out = simg[topy:bottomy+1, topx:bottomx+1]
+            try:
+                out = cv2.resize(out,simg.shape,interpolation=cv2.INTER_AREA)
+                print(out.shape)
+                crops.append(out)
+            except:
+                pass
+        return crops
+    
+    
+    def scast2(x,r):
+        xpad=jnp.pad(x,[[0,0],[0,1]], constant_values=r)
+        return xpad/jnp.linalg.norm(x,axis=1,keepdims=True)
+    def genkeys(key,n,d):
+        r=random.normal(key,(n,d))
+        r=r/jnp.linalg.norm(r,axis=1,keepdims=True)
+        r=jnp.pad(r,[[1,0],[0,1]],constant_values=0)
+        r=r.at[0,-1].set(1)
+        return r
+    def meancolor(img,b):
+        return jnp.floor(jnp.sum(img[b],(0)) / (0.01+jnp.sum(b))).astype(jnp.uint8)
+    def gsb(s):
+        x,y=jnp.where(s)
+        return x.min(), y.min(), x.max(), y.max()
+    def cropresize(img,b, bg=None):
+        x1,y1,x2,y2=gsb(b)
+        print(x1,x2,y1,y2)
+        if bg is not None:
+            img=img.copy()
+            img[b!=True]=bg
+        return cv2.resize(img[x1:x2,y1:y2,:],img.shape[:-1])
+    def maskout(img,b,bg):
+        return jnp.where(b.reshape(img.shape[:-1]+[1]),stdl, bg if bg is not None else 0)
+    def color_segments(img, threshold=.98):
+        # image is assumed to be HxWx3
+        v=jnp.reshape(img,(-1,3))/255
+        n=scast2(v-jnp.mean(v,0),0.01)
+        r=genkeys(random.PRNGKey(0),200,3)
+
+        ids=jnp.argmax(n.dot(r.transpose()), axis=1)
+        uids=jnp.unique(ids)
+        w=vmap(lambda i: jnp.sum(ids==i))(uids)/ids.size
+        ws=jnp.argsort(-w)
+        sids=uids[ws]
+        csm=jnp.cumsum(w[ws])
+        iids=jnp.array([sids[i] for i in range(1,len(sids)) if csm[i-1]<threshold])
+        rids=ids.reshape(img.shape[:-1])
+        print(rids)
+        return rids,iids,sids[0]
+    
+
+    def split_image(self,img,method="color",center=True,hulls=False):
+        masks=[]
+        bgcolor=None
+        if method=="color":
+            rids,iids,bgid=color_segments(img)
+            bgcolor=meancolor(img,rids==bgid)
+            masks += [rids==i for i in iids]
+        else:
+            img2=prep_img(img, False)
+            contours,edges=find_contours(img2)
+            if hulls:
+                contours=[cv2.convexHull(c) for c in contours if len(c)>2]
+            mask = np.zeros_like(img2) # Create mask where white is what we want, black otherwise
+            for i in range(len(contours):
+                masks += [cv2.drawContours(mask, contours, i, 1, 0)]
+        if center:
+            return [cropresize(img,b,bgcolor) for b in masks]
+        else:
+            return [maskout(img,b,bgcolor) for b in masks]        
+
+    # The database stores the image descriptors for all the known images,
+    # indexed by the image index.
+    # Either initialize as an empty dict or use the one passed in
+    def __init__(self, method_class, database = None, **kwargs):
+        self.database = database or {}
+        self.method=method_class()
+        self.split_params=kwargs
+        
+    def create_query(self, img, cache=None, **kwargs):
+        res = []
+        splits = []
+        if cache is not None:
+            splits=cache
+        else:
+            splits=self.split_image(img, **self.split_params)
+        for s in splits:
+            res.append(self.method.create_query(s, **kwargs))
+        return res
+        
+    def compare_queries(self, v1s, v2s, **kwargs):
+        if len(v1s)==0 or len(v2s)==0:
+            return 0
+        res = []
+        for v1 in v1s:
+            for v2 in v2s:
+                res.append(self.method.compare_queries(v1,v2,**kwargs))
+        res = np.array(res)
+        return np.sum(res)/res.shape(0)
+    
+    def comparison_matrix(self,v1s,v2s,**kwargs):
+        if len(v1s)==0 or len(v2s)==0:
+            return [[0]]
+        res = []
+        for v1 in v1s:
+            r1 = []
+            for v2 in v2s:
+                r1.append(self.method.compare_queries(v1,v2,**kwargs))
+            res.append(r1)
+        return res
+
+    def normalize_results(self, results, **kwargs):
+        return self.method.normalize_results(results)
+    
+    
+class single_best_split_method(split_method):
+    # change comparison of split methods to take the single best match from the bunch
+    def name(self):
+        return "Single_Best_Split_" + str(self.split_params)+ "_" + self.method.name()
+        
+    def compare_queries(self, v1s, v2s, **kwargs):
+        if len(v1s)==0 or len(v2s)==0:
+            return 0
+        res = []
+        for v1 in v1s:
+            for v2 in v2s:
+                res.append(self.method.compare_queries(v1,v2,**kwargs))
+        res = np.array(res)
+        tmp = np.max(res)
+        #print(tmp.shape)
+        return tmp
+        return np.max(res)
+    
+class single_worst_split_method(split_method):
+    # change comparison of split methods to take the single best match from the bunch
+    def name(self):
+        return "Single_Worst_Split_" + str(self.split_params)+ "_" + self.method.name()
+        
+    def compare_queries(self, v1s, v2s, **kwargs):
+        if len(v1s)==0 or len(v2s)==0:
+            return 0
+        res = []
+        for v1 in v1s:
+            for v2 in v2s:
+                res.append(self.method.compare_queries(v1,v2,**kwargs))
+        res = np.array(res)
+        tmp = np.min(res)
+        #print(tmp.shape)
+        return tmp
+        return np.min(res)
+    
+class symmetric_best_split_method(split_method):
+    # change comparison of split methods to take the single best match from the bunch
+    def name(self):
+        return "Symmetric_Best_Split_" + str(self.split_params)+ "_" + self.method.name()
+        
+    def compare_queries(self, v1s, v2s, **kwargs):
+        if len(v1s)==0 or len(v2s)==0:
+            return 0
+        res = []
+        for v1 in v1s:
+            r1=[]
+            for v2 in v2s:
+                r1.append(self.method.compare_queries(v1,v2,**kwargs))
+            res.append(r1)
+        res = np.array(res)*10
+        r2 = (scipy.special.softmax(-res,axis=1) + scipy.special.softmax(-res,axis=0)) * res
+        r3 = np.sum(res)
+        #print(r3.shape)
+        return r3
 
 # neural
 class neural_method(method_base):
@@ -73,6 +306,9 @@ class neural_method(method_base):
     model = nn.Sequential(*list(model.children())[:-1])  
     # Set model to evaluation mode
     model.eval()
+    
+    def name(self):
+        return "Neural"
 
     def create_query(self, img, **kwargs):
         scaler = transforms.Resize((224, 224))
@@ -101,6 +337,9 @@ class euclidean_neural_method(method_base):
     # Set model to evaluation mode
     model.eval()
     
+    def name(self):
+        return "Euclidean_Neural"
+    
     def create_query(self, img, **kwargs):
         scaler = transforms.Resize((224, 224))
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], 
@@ -126,6 +365,8 @@ class euclidean_neural_method(method_base):
 
 class small_neural_method(method_base):
     # this is the definition of the custom neural network
+    def name(self):
+        return "Small_Neural"
     class IconEmbeddingNet(nn.Module):
         def __init__(self):
             super().__init__()
@@ -178,6 +419,9 @@ class small_neural_method(method_base):
 class orb_method(method_base):
     orb = cv2.ORB_create()
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    
+    def name(self):
+        return "Orb"
 
     def create_query(self, img, **kwargs):
         img = gray(img)
@@ -210,68 +454,26 @@ class orb_method(method_base):
         return results
 
 
-class sift_method(method_base):
-    # and define all the auxilliary stuff needed for the method to run
-    # parameters, objects, etc...
-    sift = cv2.xfeatures2d.SIFT_create()
-    FLANN_INDEX_KDTREE = 0
-    index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
-    search_params = dict(checks=50)   # or pass empty dictionary
-    matcher = cv2.FlannBasedMatcher(index_params,search_params)
-
-    def create_query(self, img, **kwargs):
-        # preproccess the image
-        img = gray(img)
-        img = cv2.resize(img,None, fx=13, fy=13, interpolation=cv2.INTER_AREA)
-
-        # find the keypoints and descriptors with sift
-        kp1, des1 = self.sift.detectAndCompute(img,None)
-        # if sift doesn't give us enough info to match, return none
-        if len(kp1) < 2:
-            des1 = None
-        return des1
-
-    def compare_queries(self, img_kp1, img_kp2, **kwargs):
-        # compare the queries generated by two images to obtain a similarity score
-
-        # if either of the two image queries is missing, then return 0
-        if img_kp1 is None or img_kp2 is None:
-            return 0
-        # try to run the matcher, if it fails return 0
-        try:
-            matches = self.matcher.knnMatch(img_kp1, img_kp2, k=2)
-            # count up the number of matches that are "close enough"
-            score = 0
-            for i,(m,n) in enumerate(matches):
-                if m.distance < 0.7*n.distance:
-                    score += 1
-            return score
-        except:
-            return 0
-
-    def normalize_results(self, results, **kwargs):
-        # find the result with the highest score, then divide everything
-        # accordingly so that score is 100
-        best = 1
-        for i in results:
-            if i[1] > best:
-                best = i[1]
-        results = [(x[0],round(100 * x[1]/best)) for x in results]
-        return results
-
-
 class zernike_method(method_base):
+    def name(self):
+        return "Zernike"
     def create_query(self, img, **kwargs):
-        _, _, min_x, min_y, max_x, max_y, edges1 = image_preprocess(img) 
-        ## create zernike vector 
-        edges2 = edges1[min_y:max_y+1, min_x:max_x+1]
-        edges2 = cv2.resize(edges2, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
-        zernike = mahotas.features.zernike_moments(edges2, 16)  
-        return normalize(zernike[:,np.newaxis], axis=0).ravel()
+        try:
+            _, _, min_x, min_y, max_x, max_y, edges1 = image_preprocess(img) 
+            ## create zernike vector 
+            edges2 = edges1[min_y:max_y+1, min_x:max_x+1]
+            edges2 = cv2.resize(edges2, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
+            zernike = mahotas.features.zernike_moments(edges2, 16)  
+            return normalize(zernike[:,np.newaxis], axis=0).ravel()
+        except:
+            return None
 
     def compare_queries(self, x,y, **kwargs):
-        dot_prod = sum(i[0] * i[1] for i in zip(x, y))
-        return 50.0 * (dot_prod + 1.0) 
+        try:
+            dot_prod = sum(i[0] * i[1] for i in zip(x, y))
+            return 50.0 * (dot_prod + 1.0) 
+        except:
+            return 0
 
 
 class contour_method(method_base):
@@ -279,6 +481,9 @@ class contour_method(method_base):
     #fractions = [.1,.2,.3,.4,.5,.6,.7,.8,.9]    
     fractions = [.05,.1,.15,.2,.25,.3,.35,.4,.45,.5,.55,.6,.65,.7,.75,.8,.85,.9,.95]
 
+    def name(self):
+        return "Contour"
+    
     def create_query(self, img, fractions=None, **kwargs):
 
         rows, cols = img.shape[:2]
