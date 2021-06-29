@@ -72,132 +72,9 @@ class split_method(method_base):
     # wrapper around a method to enable it to work with the constituent shapes of an image
     def name(self):
         return "Split_" + str(self.split_params)+ "_" + self.method.name()
-        
-    def split_image0(self,img):
-        img=prep_img(img, False)
-        contours,edges=find_contours(img)
-        hulls=[cv2.convexHull(c) for c in contours if len(c)>2]
-        blanks=[np.zeros(img.shape, np.uint8) for h in hulls]
-        blanks=[cv2.drawContours(b, np.array([np.squeeze(h)]), -1, (255,255,255), cv2.FILLED)[...,::-1] for h,b in zip(hulls,blanks)]
-        idxs=[b!=255 for b in blanks]
-        splits=[img.copy() for b in blanks]
-        for s,i in zip(splits,idxs):
-            s[i]=0
-        return splits
-    
-    def split_image1(self,img):
-        img=prep_img(img, False)
-        contours,edges=find_contours(img)
-        crops = []
-        for idx in range(len(contours)):  
-            mask = np.zeros_like(img) # Create mask where white is what we want, black otherwise
-            cv2.drawContours(mask, contours, idx, (255,255,255), -1) # Draw filled contour in mask
 
-            # Now crop
-            (y, x, z) = np.where(mask == 255)
-            (topy, topx) = (np.min(y), np.min(x))
-            (bottomy, bottomx) = (np.max(y), np.max(x))
-            print(bottomx, topx, bottomy, topy)
-            out = img[topy:bottomy+1, topx:bottomx+1]
-            print(out.shape)
-            try:
-                out = cv2.resize(out,img.shape[:-1],interpolation=cv2.INTER_AREA)
-                print(out.shape)
-                crops.append(out)
-            except:
-                pass
-        return crops
-    
-    def split_image2(self,img):
-        img=prep_img(img, False)
-        simg = gaussian_filter(oimg, sigma=2)
-
-        X = np.reshape(simg, (-1, 1))
-        connectivity = grid_to_graph(*simg.shape)
-
-        n_clusters = 5  # number of regions
-        ward = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward',
-                                       connectivity=connectivity)
-        ward.fit(X)
-        label = np.reshape(ward.labels_, simg.shape)
-
-        crops=[]
-        for l in range(n_clusters):
-            x,y=np.where(label == l)
-            (topy, topx) = (np.min(y), np.min(x))
-            (bottomy, bottomx) = (np.max(y), np.max(x))
-            print(bottomx, topx, bottomy, topy)
-            out = simg[topy:bottomy+1, topx:bottomx+1]
-            try:
-                out = cv2.resize(out,simg.shape,interpolation=cv2.INTER_AREA)
-                print(out.shape)
-                crops.append(out)
-            except:
-                pass
-        return crops
     
     
-    def scast2(x,r):
-        xpad=jnp.pad(x,[[0,0],[0,1]], constant_values=r)
-        return xpad/jnp.linalg.norm(x,axis=1,keepdims=True)
-    def genkeys(key,n,d):
-        r=random.normal(key,(n,d))
-        r=r/jnp.linalg.norm(r,axis=1,keepdims=True)
-        r=jnp.pad(r,[[1,0],[0,1]],constant_values=0)
-        r=r.at[0,-1].set(1)
-        return r
-    def meancolor(img,b):
-        return jnp.floor(jnp.sum(img[b],(0)) / (0.01+jnp.sum(b))).astype(jnp.uint8)
-    def gsb(s):
-        x,y=jnp.where(s)
-        return x.min(), y.min(), x.max(), y.max()
-    def cropresize(img,b, bg=None):
-        x1,y1,x2,y2=gsb(b)
-        print(x1,x2,y1,y2)
-        if bg is not None:
-            img=img.copy()
-            img[b!=True]=bg
-        return cv2.resize(img[x1:x2,y1:y2,:],img.shape[:-1])
-    def maskout(img,b,bg):
-        return jnp.where(b.reshape(img.shape[:-1]+[1]),stdl, bg if bg is not None else 0)
-    def color_segments(img, threshold=.98):
-        # image is assumed to be HxWx3
-        v=jnp.reshape(img,(-1,3))/255
-        n=scast2(v-jnp.mean(v,0),0.01)
-        r=genkeys(random.PRNGKey(0),200,3)
-
-        ids=jnp.argmax(n.dot(r.transpose()), axis=1)
-        uids=jnp.unique(ids)
-        w=vmap(lambda i: jnp.sum(ids==i))(uids)/ids.size
-        ws=jnp.argsort(-w)
-        sids=uids[ws]
-        csm=jnp.cumsum(w[ws])
-        iids=jnp.array([sids[i] for i in range(1,len(sids)) if csm[i-1]<threshold])
-        rids=ids.reshape(img.shape[:-1])
-        print(rids)
-        return rids,iids,sids[0]
-    
-
-    def split_image(self,img,method="color",center=True,hulls=False):
-        masks=[]
-        bgcolor=None
-        if method=="color":
-            rids,iids,bgid=color_segments(img)
-            bgcolor=meancolor(img,rids==bgid)
-            masks += [rids==i for i in iids]
-        else:
-            img2=prep_img(img, False)
-            contours,edges=find_contours(img2)
-            if hulls:
-                contours=[cv2.convexHull(c) for c in contours if len(c)>2]
-            mask = np.zeros_like(img2) # Create mask where white is what we want, black otherwise
-            for i in range(len(contours):
-                masks += [cv2.drawContours(mask, contours, i, 1, 0)]
-        if center:
-            return [cropresize(img,b,bgcolor) for b in masks]
-        else:
-            return [maskout(img,b,bgcolor) for b in masks]        
-
     # The database stores the image descriptors for all the known images,
     # indexed by the image index.
     # Either initialize as an empty dict or use the one passed in
@@ -207,15 +84,18 @@ class split_method(method_base):
         self.split_params=kwargs
         
     def create_query(self, img, cache=None, **kwargs):
-        res = []
-        splits = []
-        if cache is not None:
-            splits=cache
-        else:
-            splits=self.split_image(img, **self.split_params)
-        for s in splits:
-            res.append(self.method.create_query(s, **kwargs))
-        return res
+        try:
+            res = []
+            splits = []
+            if cache is not None:
+                splits=cache
+            else:
+                splits=split_image(img, **self.split_params)
+            for s in splits:
+                res.append(self.method.create_query(s, **kwargs))
+            return res
+        except:
+            return None
         
     def compare_queries(self, v1s, v2s, **kwargs):
         if len(v1s)==0 or len(v2s)==0:

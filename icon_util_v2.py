@@ -36,8 +36,78 @@ def instantiate_databases(methods,name):
     for method in methods:
         filename="db_"+method.name()+"_"+name
         db = load_obj(filename)
-        method = method.instantiate(db)
+        method.db=db
     return methods
+
+def scast2(x,r):
+        xpad=np.pad(x,[[0,0],[0,1]], constant_values=r)
+        return xpad/np.linalg.norm(x,axis=1,keepdims=True)
+def genkeys(n,d):
+    r=np.random.normal(size=(n,d))
+    r=r/np.linalg.norm(r,axis=1,keepdims=True)
+    r=np.pad(r,[[1,0],[0,1]],constant_values=0)
+    r[0,-1]=1
+    return r
+def meancolor(img,b):
+    return np.floor(np.sum(img[b],(0)) / (0.01+np.sum(b))).astype(np.uint8)
+def gsb(s):
+    x,y=np.where(s)
+    return x.min(), y.min(), x.max(), y.max()
+def cropresize(img,b, bg=None):
+    try:
+        x1,y1,x2,y2=gsb(b)
+        if bg is not None:
+            img=img.copy()
+            img[b!=True]=bg
+        return cv2.resize(img[x1:x2,y1:y2,:],img.shape[:-1])
+    except:
+        return None
+def maskout(img,b,bg):
+    try:
+        return np.where(b.reshape(img.shape[:-1]+[1]),stdl, bg if bg is not None else 0)
+    except:
+        return None
+def color_segments(img, threshold=.98):
+    # image is assumed to be HxWx3
+    v=np.reshape(img,(-1,3))/255
+    n=scast2(v-np.mean(v,0),0.01)
+    r=genkeys(200,3)
+
+    ids=np.argmax(n.dot(r.transpose()), axis=1)
+    uids=np.unique(ids)
+    w=np.array([np.sum(ids==i) for i in uids])/ids.size
+    ws=np.argsort(-w)
+    sids=uids[ws]
+    csm=np.cumsum(w[ws])
+    iids=np.array([sids[i] for i in range(1,len(sids)) if csm[i-1]<threshold])
+    rids=ids.reshape(img.shape[:-1])
+    return rids,iids,sids[0]
+
+
+def split_image(img,method="color",center=True,hulls=False):
+    # pass this an image, and it will return a list of sub-images.
+    # method: determines whether to split by color or using the contour method
+    # center: whether to center and resize the split parts, or to leave them in their original location in the image
+    # hulls: if true use the convex hull of the contour, otherwise use the raw contour 
+    masks=[]
+    bgcolor=None
+    if method=="color":
+        rids,iids,bgid=color_segments(img)
+        bgcolor=meancolor(img,rids==bgid)
+        masks += [rids==i for i in iids]
+    else:
+        img2=prep_img(img, False)
+        contours,edges=find_contours(img2)
+        if hulls:
+            contours=[cv2.convexHull(c) for c in contours if len(c)>2]
+        mask = np.zeros_like(img2) # Create mask where white is what we want, black otherwise
+        for i in range(len(contours)):
+            masks += [cv2.drawContours(mask, contours, i, 1, 0)]
+    if center:
+        return [cropresize(img,b,bgcolor) for b in masks]
+    else:
+        return [maskout(img,b,bgcolor) for b in masks]        
+
         
 
 def gray( img ):
