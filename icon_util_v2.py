@@ -45,7 +45,7 @@ def scast2(x,r):
 def genkeys(n,d):
     r=np.random.normal(size=(n,d))
     r=r/np.linalg.norm(r,axis=1,keepdims=True)
-    r=np.pad(r,[[1,0],[0,1]],constant_values=0)
+    r=np.pad(r,[[1,0],[0,1]],mode="constant",constant_values=0)
     r[0,-1]=1
     return r
 def meancolor(img,b):
