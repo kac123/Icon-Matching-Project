@@ -40,7 +40,7 @@ def instantiate_databases(methods,name):
     return methods
 
 def scast2(x,r):
-        xpad=np.pad(x,[[0,0],[0,1]], constant_values=r)
+        xpad=np.pad(x,[[0,0],[0,1]],mode="constant", constant_values=r)
         return xpad/np.linalg.norm(x,axis=1,keepdims=True)
 def genkeys(n,d):
     r=np.random.normal(size=(n,d))
