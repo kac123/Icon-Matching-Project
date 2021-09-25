@@ -21,15 +21,9 @@ class method_base(object):
     def name(self):
         return "Base"
 
-    # The database stores the image descriptors for all the known images,
-    # indexed by the image index.
-    # Either initialize as an empty dict or use the one passed in
-    def __init__(self, database = None):
-        self.database = database or {}
-
     # Take in an image and return its descriptor calculated by the method.
     # Each method will override this.
-    def create_query(self, img, **kwargs):
+    def create(self, img, **kwargs):
         return 1
 
     # Take in two descriptors and say how similar they are.
