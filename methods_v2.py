@@ -9,6 +9,9 @@ import cv2
 import numpy as np
 import math
 import mahotas
+import timm
+from timm.data import resolve_data_config
+from timm.data.transforms_factory import create_transform
 from sklearn.preprocessing import normalize
 
 from icon_util_v2 import *
@@ -178,6 +181,41 @@ class symmetric_best_split_method(split_method):
         #print(r3.shape)
         return r3
 
+    
+timm_names=['vit_small_r26_s32_224',
+            'cspdarknet53',
+            'tf_efficientnetv2_l',
+            'resnet50',
+            'ecaresnetlight',
+            'mixnet_s',
+            'res2next50',
+            'wide_resnet50_2']
+class timm_method(method_base):
+    def __init__(self, database = None, modelname=timm_names[0], cuda=False):
+        self.model = timm.create_model(modelname,pretrained=True,num_classes=0)
+        if cuda:
+            self.model = self.model.cuda()
+        config = resolve_data_config({},model=self.model)
+        self.transform = create_transform(**config)
+        self.topil=transforms.ToPILImage()
+        self.nameval = 'Timm_'+modelname
+        self.cuda=cuda
+    def name(self):
+        return self.nameval
+    def create_query(self,img,**kwargs):
+        try:
+            timg=self.topil(img)
+            timg=self.transform(timg).unsqueeze(0)
+            if self.cuda:
+                timg=timg.cuda()
+            return self.model(timg).squeeze().detach().numpy()
+        except:
+            return None
+    def compare_queries(self,v1,v2,**kwargs):
+        try:
+            return np.dot(v1,v2)
+        except:
+            return -1.0
 # neural
 class neural_method(method_base):
     # Load the pretrained model
