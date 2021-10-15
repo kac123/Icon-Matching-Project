@@ -1,24 +1,20 @@
 import numpy as np
 import cv2
 
-def grayto3(img):
+def maybetocolor(img):
     # turn a 1 channel grayscale image into a 3 channel image
-    if len(img.shape) <3:
+    # still gray, but now can be used for methods that normaly work on
+    # color images
+    if len(img.shape) != 3:
         return np.repeat(img[...,np.newaxis],3,axis=2)
     return img
 
-def gray( img ):
-    # create grayscale image from database image
-    
+def maybetogray(img):
+    # turn a color image to a grayscale one
     # if the image is already grayscale, just return
-    if(len(np.shape(img)) < 3):
-        return img
-    
-    if np.shape(img)[2] == 3:
-        img = np.dot( img, [0.299, 0.587, 0.114] )
-    else:
-        img = np.dot( np.transpose( img, (1,2,0)), [0.299, 0.587, 0.114] )
-    return img.astype(np.uint8)
+    if len(img.shape) == 3:
+        return np.dot(img, [0.299, 0.587, 0.114]).astype(np.uint8)
+    return img
 
 def add_border(img, size):
     rows,cols = img.shape[:2]
@@ -38,7 +34,7 @@ def add_border(img, size):
     return array.astype(np.uint8)
     
 def image_preprocess(img):
-    img = gray(img)
+    img = maybetogray(img)
     rows,cols = img.shape[:2]
     # create grayscale image and use Canny edge detection
     cimg = canny(img)   
@@ -49,7 +45,7 @@ def image_preprocess(img):
 
 def prep_img(img,mgray=True):
     if mgray:
-        img = gray(img)
+        img = maybetogray(img)
     img = add_border(img, 16)
     rows,cols = img.shape[:2]
     scale = (128 / max(rows,cols))
