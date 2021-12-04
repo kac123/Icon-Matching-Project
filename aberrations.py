@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 from scipy import stats as sstats
 import random
+from imageprocessing import bg_stats
 
 def ab_id(img):
     return img
@@ -73,6 +74,19 @@ def ab_translate(img, border=None, return_coords=False, limiter=0):
         return img, (dx,dy)
     return img
 
+def ab_translate_safe(img, limit=1/5):
+    height,width = img.shape[:2]
+    ylim = int(height*limit)
+    xlim = int(width*limit)
+    center, (xmin,xmax,ymin,ymax) = bg_stats(img)
+    xd = min(xlim, (xmax-xmin)/2)
+    yd = min(ylim, (ymax-ymin)/2)
+    dx = random.randint(-xd,xd)
+    dy = random.randint(-yd,yd)
+    M = np.float32([[1,0,dx],[0,1,dy]])
+    nimg = cv2.warpAffine(img,M,(width,height),borderMode=cv2.BORDER_REPLICATE)
+    return nimg
+
 def ab_rotate(img, border=None, borderMode=cv2.BORDER_REPLICATE):
     rows,cols,_ = img.shape
     M = cv2.getRotationMatrix2D(((cols-1)/2.0,(rows-1)/2.0),random.randint(0,360),1)
@@ -81,6 +95,20 @@ def ab_rotate(img, border=None, borderMode=cv2.BORDER_REPLICATE):
     else:
         img = cv2.warpAffine(img,M,(cols,rows),borderMode=borderMode)
     return img
+
+def ab_rotate_safe(img, angle=None):
+    angle = angle or random.randint(0,359)
+    height, width = img.shape[:2]
+    center = (width/2, height/2)
+    rmat = cv2.getRotationMatrix2D(center, angle, 1.)
+    abcos = abs(rmat[0,0])
+    absin = abs(rmat[0,1])
+    bound_w = int(height*absin + width*abcos)
+    bound_h = int(height*abcos + width*absin)
+    rmat[0,2] += bound_w/2 - center[0]
+    rmat[1,2] += bound_h/2 - center[1]
+    nimg = cv2.warpAffine(img,rmat,(bound_w,bound_h))
+    return nimg
 
 def ab_affine(img, border=None):
     # cv2.getAffineTransform takes 3 input points and 3 output points, and returns the affine transformation matrix mapping the input points to the output.
@@ -154,7 +182,7 @@ def ab_affine_border(img):
     img = ab_affine(img, border)
     return img
 
-border_geometric = [ab_rotate_border, ab_translate_border, ab_scale_border, ab_affine_border]
+border_geometric = [ab_rotate_border,  ab_rotate_safe, ab_translate_border, ab_translate_safe, ab_scale_border, ab_affine_border]
 all_geometric = border_geometric+[ab_flip]
 
 # this applies multiple drawings

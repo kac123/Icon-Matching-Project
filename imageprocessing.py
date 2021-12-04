@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+from scipy.stats import mode
 
 def maybetocolor(img):
     # turn a 1 channel grayscale image into a 3 channel image
@@ -15,6 +16,24 @@ def maybetogray(img):
     if len(img.shape) == 3:
         return np.dot(img, [0.299, 0.587, 0.114]).astype(np.uint8)
     return img
+def bg_stats(img,bordersize=2):
+    mask=np.ones_like(img).astype(float)
+    mask[bordersize:-bordersize,bordersize:-bordersize,:]=np.NaN
+    commoncolor=mode((img*mask).reshape(-1,3), axis=(0), nan_policy="omit").mode.data.astype(int)[np.newaxis,:,:]
+    indices=np.argwhere(img==commoncolor)[:,:2]
+    center=np.mean(indices,axis=0).astype(int)
+    xmax,ymax = np.max(indices,axis=0)
+    xmin,ymin = np.min(indices,axis=0)
+    return center, (xmin,xmax,ymin,ymax)
+
+def recenter(img):
+    height,width = img.shape[:2]
+    center, (xmin,xmax,ymin,ymax) = bg_stats(img)
+    dx = width/2-center[0]
+    dy = height/2-center[1]
+    M = np.float32([[1,0,dx],[0,1,dy]])
+    nimg = cv2.warpAffine(img,M,(width,height),borderMode=cv2.BORDER_REPLICATE)
+    return nimg
 
 def add_border(img, size):
     rows,cols = img.shape[:2]
@@ -27,7 +46,7 @@ def add_border(img, size):
         common = int(max(set(border), key = border.count))
         array = cv2.copyMakeBorder( img,  size, size, size, size, cv2.BORDER_CONSTANT, value =  common)
     except:
-        common = sstats.mode(border)[0][0] # get the most common color
+        common = mode(border)[0][0] # get the most common color
         common = tuple(map(int, common)) # convert to a tuple of ints to pass as color
         array = cv2.copyMakeBorder( img,  size, size, size, size, cv2.BORDER_CONSTANT, value =  common)
 
