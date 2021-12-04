@@ -10,6 +10,7 @@ from glob import glob
 from tqdm import tqdm, tnrange, tqdm_notebook
 import os
 import scipy.stats as sstats
+from PIL import Image, ImageOps
 
 # the utility functions
  
@@ -150,13 +151,20 @@ def image_preprocess(img):
     
     return rows, cols, min_x, min_y, max_x, max_y, dcimg    
 
-def prep_img(img,gray=True):
-    if gray:
+def prep_img(img,grayscale=True):
+    if grayscale:
         img = gray(img)
+    img = cv2.medianBlur(img,3)
     img = add_border(img, 16)
     rows,cols = img.shape[:2]
-    scale = (128 / max(rows,cols))
-    img = cv2.resize(img,  (int(rows * scale), int(cols * scale)))    
+    scale = (256 / max(rows,cols))
+    #### resize without antialiasing
+    #img = cv2.resize(img,  (int(rows * scale), int(cols * scale)))  
+    ### resize with antialiasing
+    img = Image.fromarray(img)
+    img = ImageOps.fit(img, (int(rows * scale), int(cols * scale)), Image.ANTIALIAS)
+    img = np.asarray(img)
+
     return img
 
 def adjust_gamma(image, gamma=1.0):
@@ -351,9 +359,9 @@ def edge_detect( img ):
         
     return edges1, edges2 
 
-def find_contours(img):
+def find_contours(img, n = 20):
 
-    gamma_list = [0.2, 0.33, 0.5, 1, 1.5, 3, 5]
+    gamma_list = [1]
     perimeter_list = []
     
     for g in range(0,len(gamma_list)):
@@ -364,9 +372,9 @@ def find_contours(img):
         edges_gamma, edges2_gamma = edge_detect(img_gamma) 
         
         # use ellipse dilation to fill the gaps in countours  
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-        edges_gamma = cv2.dilate(edges_gamma, kernel)
-        edges2_gamma = cv2.dilate(edges2_gamma, kernel)
+        #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+        #edges_gamma = cv2.dilate(edges_gamma, kernel)
+        #edges2_gamma = cv2.dilate(edges2_gamma, kernel)
         
         # find contours from edge image    
         try:
@@ -375,7 +383,7 @@ def find_contours(img):
             image, contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
             
         # use 10 biggest countours      
-        contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:5]  
+        contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:n]  
         total_perimeter_gamma = 0
         for n, contour_g in enumerate(contours_gamma):
             total_perimeter_gamma += cv2.arcLength(contour_g,False)   
@@ -385,14 +393,14 @@ def find_contours(img):
     g_max = perimeter_list.index(max(perimeter_list))   
     img_gamma = adjust_gamma(img, gamma_list[g_max]) 
     edges_gamma, edges2_gamma = edge_detect(img_gamma)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-    edges_gamma = cv2.dilate(edges_gamma, kernel)
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+    #edges_gamma = cv2.dilate(edges_gamma, kernel)
     try:
         contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
     except:
         image, contours_gamma, hier = cv2.findContours(edges_gamma,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
             
-    contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:5]  
+    contours_gamma = sorted(contours_gamma, key = lambda x:cv2.contourArea(x), reverse = True)[:n]  
       
     return contours_gamma, edges2_gamma
 
