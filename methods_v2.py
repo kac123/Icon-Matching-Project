@@ -402,6 +402,32 @@ class contour_method(method_base):
     def name(self):
         return "Contour"
     
+    def create_subimages(self, img, fractions=None, **kwargs): 
+
+        rows, cols = img.shape[:2]  
+        if max(rows,cols) < 64:
+            img = add_border(img, 16)    
+            rows,cols = img.shape[:2]
+            if max(rows,cols) < 256:
+                scale = 4
+            else:
+                scale = 1
+            img = Image.fromarray(img)
+            img = ImageOps.fit(img, (int(rows * scale), int(cols * scale)), Image.ANTIALIAS)
+            img = np.asarray(img)
+
+        contours, edges = find_contours(img)
+        x_list=[]
+        y_list=[]
+        for n, cnt in enumerate(contours):
+        
+            x_coord = cnt[:,0, 0]
+            y_coord = cnt[:,0, 1] 
+            x_list.append(x_coord)
+            y_list.append(y_coord)
+
+        return x_list, y_list
+    
     def create_query(self, img, fractions=None, **kwargs):
 
         rows, cols = img.shape[:2]
