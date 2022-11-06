@@ -8,6 +8,8 @@ import h5py
 import numpy as np
 import tempfile
 
+# Please don't run this on the cloud, it costs so much.
+
 from methods import small_neural_method, neural_method, orb_method, zernike_method, contour_method
 from icon_util import web_plot,  test_combined, load_databases, gray
 methods = load_databases([zernike_method, orb_method, neural_method, contour_method, small_neural_method], "icon1k")
@@ -42,7 +44,7 @@ def upload_file():
             method_choice = request.form.getlist('methods')
             res = run_image(file, method_choice)
             return send_file(res, mimetype='image/png')
-            
+
     return '''
     <!doctype html>
     <title>TEST YOUR IMAGE FOR PLAGIARISM!</title>
@@ -62,7 +64,7 @@ def upload_file():
 def run_image(filename, method_choice):
     img  = numpy.frombuffer(filename.read(), dtype='uint8')
     img = cv2.imdecode(img, cv2.IMREAD_UNCHANGED)
-    
+
     print("starting")
     method_names = ["Zernike", "ORB", "BIGNeural", "Contour", "smallNeural"]
     weights=[
