@@ -14,7 +14,7 @@ from timm.data import resolve_data_config
 from timm.data.transforms_factory import create_transform
 from sklearn.preprocessing import normalize
 
-from icon_util_v2 import *
+from libseg.icon_util import *
 
 class method_base(object):
     # base class that all methods inherit from
