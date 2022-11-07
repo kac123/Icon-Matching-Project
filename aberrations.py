@@ -6,54 +6,8 @@ import random
 def ab_id(img):
     return img
 
-def translate_stream(img):
-    yield img
-    rows,cols,_ = img.shape
-    for dx in range(-rows//2, rows//2):
-        for dy in range(-cols//2, cols//2):
-            M = np.float32([[1,0,dx],[0,1,dy]])
-            yield cv2.warpAffine(img,M,(cols,rows), borderMode=cv2.BORDER_WRAP), (dx, dy)
-            
-def rotate_stream(img, border=None, borderMode=cv2.BORDER_REPLICATE):
-    p_img = img
-    yield p_img
-    rows,cols,_ = img.shape
-    for i in range(0, 360):
-        M = cv2.getRotationMatrix2D(((cols-1)/2.0,(rows-1)/2.0),i,1)
-        if border is not None:
-            p_img = cv2.warpAffine(img,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT,borderValue=border)
-        else:
-            p_img = cv2.warpAffine(img,M,(cols,rows),borderMode=borderMode)
-        yield p_img, i
-
-        
-def scale_stream(img, border=None, borderMode=cv2.BORDER_REPLICATE):
-    p_img = img
-    yield p_img
-    rows,cols,_ = img.shape
-    for i in range(60, 201):
-        M = cv2.getRotationMatrix2D(((cols-1)/2.0,(rows-1)/2.0),0,i/100)
-        if border is not None:
-            p_img = cv2.warpAffine(img,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT,borderValue=border)
-        else:
-            p_img = cv2.warpAffine(img,M,(cols,rows),borderMode=borderMode)
-        yield p_img, i
-
-             
-
-def stream(img, transformation, N, **kwargs):
-    yield img
-    for i in range(N):
-        yield transformation(img, **kwargs)
-        
-def invariance_measure(method, stream):
-    img_v = method.create_query(next(stream))
-    for p_img, d in stream:
-        yield (method.compare_queries(img_v, method.create_query(p_img)), d)
-
-
 # the first 5 are the basic geometric transformations
-def ab_translate(img, border=None, return_coords=False, limiter=0):
+def ab_translate(img, border="wrap", return_coords=False, limiter=0):
     rows,cols,_ = img.shape
     if limiter == 0:
         dx = random.randint(-rows,rows)
